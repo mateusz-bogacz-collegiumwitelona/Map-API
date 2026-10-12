@@ -10,8 +10,9 @@ builder.Services.AddControllers();
 builder.Services.AddCorsConfiguration(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSwaggerConfiguration();
-builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AppDbContext>("database");
+builder.Services.AddHealthCheckConfiguration();
+builder.Services.AddRoutingConfiguration();
+builder.Services.AddFluentValidationConfiguration();
 
 var app = builder.Build();
 
