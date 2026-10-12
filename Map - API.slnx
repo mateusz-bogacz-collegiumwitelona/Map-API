@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="Api/Api.csproj" />
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
+  <Project Path="Domain/Domain.csproj" />
+  <Project Path="Email/Email.csproj" />
+  <Project Path="Infrastructure/Infrastructure.csproj" />
+  <Project Path="Services/Services.csproj" />
+</Solution>
