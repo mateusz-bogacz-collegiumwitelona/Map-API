@@ -26,10 +26,13 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore dependencies
-        run: dotnet restore Map - API.slnx  
+        run: dotnet restore Map-API.slnx  
+
+      - name: Linter / Code Formatting Check
+        run: dotnet format "Map - API.slnx" --verify-no-changes --verbosity normal
 
       - name: Build
-        run: dotnet build  Map - API.slnx --no-restore --configuration Release
+        run: dotnet build  Map-API.slnx --no-restore --configuration Release
 
       - name: Test
         run: dotnet run --project Tests/Tests.csproj --no-build --configuration Release --verbosity normal --property:TestingPlatformDotnetTestSupport=true
