@@ -26,10 +26,10 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore dependencies
-        run: dotnet restore SPCRM_Backend.slnx  
+        run: dotnet restore Map - API.slnx  
 
       - name: Build
-        run: dotnet build  SPCRM_Backend.slnx --no-restore --configuration Release
+        run: dotnet build  Map - API.slnx --no-restore --configuration Release
 
       - name: Test
         run: dotnet run --project Tests/Tests.csproj --no-build --configuration Release --verbosity normal --property:TestingPlatformDotnetTestSupport=true
