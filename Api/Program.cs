@@ -12,7 +12,7 @@ try
 
     // Configure logging with Serilog
     builder.ConfigureSerilog();
-    
+
     // Add services to the container.
     builder.Services.AddControllers();
 
