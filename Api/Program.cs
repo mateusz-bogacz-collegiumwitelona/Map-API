@@ -1,35 +1,52 @@
 using Api.Configuration;
 using Infrastructure;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-// Add services to the container.
-builder.Services.AddControllers();
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
 
-// configs 
-builder.Services.AddCorsConfiguration(builder.Configuration);
-builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddSwaggerConfiguration();
-builder.Services.AddHealthCheckConfiguration();
-builder.Services.AddRoutingConfiguration();
-builder.Services.AddFluentValidationConfiguration();
+    // Configure logging with Serilog
+    builder.ConfigureSerilog();
+    
+    // Add services to the container.
+    builder.Services.AddControllers();
 
-var app = builder.Build();
+    // configs 
+    builder.Services.AddCorsConfiguration(builder.Configuration);
+    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddSwaggerConfiguration();
+    builder.Services.AddHealthCheckConfiguration();
+    builder.Services.AddRoutingConfiguration();
+    builder.Services.AddFluentValidationConfiguration();
 
+    var app = builder.Build();
 
-// Auto-migrate database on startup
-await app.ApplyMigrationsAsync();
+    // Auto-migrate database on startup
+    await app.ApplyMigrationsAsync();
 
-app.MapHealthChecks("/health");
+    app.UseSerilogRequestLogging();
 
-app.UseSwaggerUIConfiguration();
+    app.MapHealthChecks("/health");
 
-app.UseHttpsRedirection();
+    app.UseSwaggerUIConfiguration();
 
-app.UseCorsConfiguration();
+    app.UseHttpsRedirection();
 
-app.UseAuthorization();
+    app.UseCorsConfiguration();
 
-app.MapControllers();
+    app.UseAuthorization();
 
-app.Run();
+    app.MapControllers();
+
+    app.Run();
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"An error occurred: {ex.Message}");
+    throw;
+}
