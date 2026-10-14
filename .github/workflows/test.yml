@@ -1,0 +1,38 @@
+name: Run Tests
+
+on:
+  push:
+    branches: 
+      - '**'
+  pull_request:
+    branches: 
+      - 'main'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore Map-API.slnx  
+
+      - name: Linter / Code Formatting Check
+        run: dotnet format Map-API.slnx --verify-no-changes --verbosity normal
+
+      - name: Build
+        run: dotnet build  Map-API.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet run --project Tests/Tests.csproj --no-build --configuration Release --verbosity normal --property:TestingPlatformDotnetTestSupport=true
