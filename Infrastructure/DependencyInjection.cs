@@ -27,7 +27,7 @@ namespace Infrastructure
             });
 
             // identity config
-            services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+            services.AddIdentity<User, IdentityRole<Guid>>(options =>
             {
                 options.Password.RequireDigit = true;
                 options.Password.RequireLowercase = true;

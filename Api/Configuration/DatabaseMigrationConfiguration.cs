@@ -20,7 +20,7 @@ namespace Api.Configuration
                 await dbContext.Database.MigrateAsync();
 
                 var roleManager = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-                var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+                var userManager = services.GetRequiredService<UserManager<User>>();
 
             }
             catch (Exception ex)

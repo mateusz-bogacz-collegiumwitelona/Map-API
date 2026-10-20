@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure
 {
-    public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
+    public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
@@ -17,7 +17,7 @@ namespace Infrastructure
 
             builder.HasPostgresExtension("postgis");
 
-            builder.Entity<ApplicationUser>().ToTable("User");
+            builder.Entity<User>().ToTable("User");
         }
     }
 }
