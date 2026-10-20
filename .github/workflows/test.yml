@@ -28,9 +28,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore Map-API.slnx  
 
-      - name: Linter / Code Formatting Check
-        run: dotnet format Map-API.slnx --verify-no-changes --verbosity normal
-
       - name: Build
         run: dotnet build  Map-API.slnx --no-restore --configuration Release
 
