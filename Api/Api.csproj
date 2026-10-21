@@ -35,4 +35,10 @@
     <ProjectReference Include="..\Services\Services.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Mappers\" />
+    <Folder Include="Validators\" />
+    <Folder Include="Request\" />
+  </ItemGroup>
+
 </Project>
