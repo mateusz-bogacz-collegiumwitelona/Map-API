@@ -1,5 +1,6 @@
 ﻿using Domain.Models;
 using Infrastructure;
+using Infrastructure.Seeders;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,10 +18,15 @@ namespace Api.Configuration
             try
             {
                 var dbContext = services.GetRequiredService<AppDbContext>();
+                
+                logger.LogInformation("Initiating a database migration...");
                 await dbContext.Database.MigrateAsync();
 
-                var roleManager = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-                var userManager = services.GetRequiredService<UserManager<User>>();
+                logger.LogInformation("Initiating a data seeder...");
+                var seeder = services.GetRequiredService<SeedData>();
+                await seeder.InitAsync();
+
+                logger.LogInformation("The database has been successfully migrated and initialized.");
 
             }
             catch (Exception ex)
