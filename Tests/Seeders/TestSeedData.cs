@@ -4,8 +4,10 @@ using Infrastructure.Seeders;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using NetTopologySuite.Geometries;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -65,8 +67,11 @@ public class TestSeedData
         var schemaConnectionString = $"{_connectionString};SearchPath={_currentSchema},public;Pooling=false;";
 
         var services = new ServiceCollection();
-        
-        services.AddLogging();
+
+        services.AddLogging(builder => builder.AddConsole());
+
+        services.AddHttpClient();
+        services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
 
         services.AddDbContext<AppDbContext>(options =>
         {
@@ -118,7 +123,7 @@ public class TestSeedData
         await Assert.That(userRoleExists).IsTrue();
 
         var usersCount = await UserManager.Users.CountAsync();
-        await Assert.That(usersCount).IsEqualTo(5);
+        await Assert.That(usersCount).IsEqualTo(6);
 
         var publicUser = await UserManager.FindByEmailAsync("public@example.pl");
         await Assert.That(publicUser).IsNotNull();
@@ -128,6 +133,11 @@ public class TestSeedData
 
         var isInRole = await UserManager.IsInRoleAsync(publicUser, "User");
         await Assert.That(isInRole).IsTrue();
+
+        var adminUser = await UserManager.FindByEmailAsync("admin@example.pl");
+        await Assert.That(adminUser).IsNotNull();
+        var isAdmin = await UserManager.IsInRoleAsync(adminUser!, "Admin");
+        await Assert.That(isAdmin).IsTrue();
     }
 
     [Test]
@@ -142,8 +152,42 @@ public class TestSeedData
         // Assert 
         var rolesCount = await RoleManager.Roles.CountAsync();
         var usersCount = await UserManager.Users.CountAsync();
+        var countriesCount = await Context.Countries.CountAsync();
 
         await Assert.That(rolesCount).IsEqualTo(2);
-        await Assert.That(usersCount).IsEqualTo(5);
+        await Assert.That(usersCount).IsEqualTo(6);
+        await Assert.That(countriesCount).IsGreaterThan(150);
+    }
+
+
+    [Test]
+    public async Task InitAsync_WhenDatabaseIsEmpty_ShouldSeedRealCountriesWithValidSpatialBoundaries()
+    {
+        // Act
+        await Sut.InitAsync();
+
+        // Assert
+        var countriesCount = await Context.Countries.CountAsync();
+        await Assert.That(countriesCount).IsGreaterThan(150);
+
+        // Assert 
+        var poland = await Context.Countries.FirstOrDefaultAsync(c => c.Code == "PL" || c.Code == "POL");
+        await Assert.That(poland).IsNotNull();
+        await Assert.That(poland!.Name).IsEqualTo("Poland");
+        await Assert.That(poland.Boundary).IsNotNull();
+        await Assert.That(poland.Boundary.SRID).IsEqualTo(4326);
+
+        var legnicaPoint = new Point(16.16, 51.21) { SRID = 4326 };
+
+        bool isLegnicaInPoland = poland.Boundary.Contains(legnicaPoint);
+        await Assert.That(isLegnicaInPoland).IsTrue();
+    }
+
+    private class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+        public string ApplicationName { get; set; } = "Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = null!;
     }
 }
