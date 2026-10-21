@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain.Enum;
+using Domain.Models;
 using Infrastructure;
 using Infrastructure.Seeders;
 using Microsoft.AspNetCore.Identity;
@@ -202,6 +203,51 @@ public class TestSeedData
         await Assert.That(legnica.Location.X).IsEqualTo(16.16);
         await Assert.That(legnica.Location.Y).IsEqualTo(51.21);
         await Assert.That(legnica.Location.SRID).IsEqualTo(4326);
+    }
+
+    [Test]
+    public async Task InitAsync_WhenDatabaseIsEmpty_ShouldSeedTripsSegmentsAndVisitedCountries()
+    {
+        // Act
+        await Sut.InitAsync();
+
+        // Assert 
+        var tripsCount = await Context.Trips.CountAsync();
+        await Assert.That(tripsCount).IsGreaterThanOrEqualTo(15);
+
+        var adminUser = await UserManager.FindByEmailAsync("admin@example.pl");
+        var adminTripsCount = await Context.Trips.CountAsync(t => t.UserId == adminUser!.Id);
+        await Assert.That(adminTripsCount).IsEqualTo(0);
+
+        var transportModes = await Context.TripSegments
+            .Select(s => s.TransportType)
+            .Distinct()
+            .ToListAsync();
+
+        await Assert.That(transportModes).Contains(TransportTypeEnum.Car);
+        await Assert.That(transportModes).Contains(TransportTypeEnum.Plane);
+        await Assert.That(transportModes).Contains(TransportTypeEnum.Train);
+        await Assert.That(transportModes).Contains(TransportTypeEnum.Other);
+
+        var publicUser = await UserManager.FindByEmailAsync("public@example.pl");
+        var mallorcaTrip = await Context.Trips
+            .FirstOrDefaultAsync(t => t.UserId == publicUser!.Id && t.Title.Contains("Majorce"));
+
+        await Assert.That(mallorcaTrip).IsNotNull();
+
+        var mallorcaSegments = await Context.TripSegments
+            .Where(s => s.TripId == mallorcaTrip!.Id)
+            .OrderBy(s => s.OrderIndex)
+            .Include(s => s.OriginPlace)
+            .Include(s => s.DestinationPlace)
+            .ToListAsync();
+
+        await Assert.That(mallorcaSegments.Count).IsEqualTo(8);
+        await Assert.That(mallorcaSegments.First().OriginPlace.Name).IsEqualTo("Legnica");
+        await Assert.That(mallorcaSegments.Last().DestinationPlace.Name).IsEqualTo("Legnica");
+
+        var visitedCountriesCount = await Context.VisitedCountries.CountAsync();
+        await Assert.That(visitedCountriesCount).IsGreaterThanOrEqualTo(15);
     }
 
     private class TestHostEnvironment : IHostEnvironment
