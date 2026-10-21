@@ -39,7 +39,7 @@ namespace Api.Middlewares
                 _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred. Please contact support.", ErrorCodes.InternalError)
             };
 
-            var result = Result<object>.Failure(
+            var result = Result.Failure(
                 message: message,
                 statusCode: statusCode,
                 errorCode: errorCode

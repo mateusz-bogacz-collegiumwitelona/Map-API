@@ -1,16 +1,15 @@
 ﻿using Api.Controllers.Base;
 using Domain.Common;
+using Domain.Const;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using System.Text.Json;
 
 namespace Tests.Other
 {
     public class BaseControllerTests
     {
         private TestController _sut = null!;
-
 
         [Before(Test)]
         public void Setup()
@@ -22,12 +21,6 @@ namespace Tests.Other
                     HttpContext = new DefaultHttpContext()
                 }
             };
-        }
-
-        private static JsonElement ToJsonElement(object? value)
-        {
-            var json = JsonSerializer.Serialize(value);
-            return JsonSerializer.Deserialize<JsonElement>(json);
         }
 
         // ─── CurrentUserId ─────────────────────────────
@@ -72,11 +65,13 @@ namespace Tests.Other
             // Assert
             var objectResult = actionResult as ObjectResult;
             await Assert.That(objectResult).IsNotNull();
-            await Assert.That(objectResult!.StatusCode).IsEqualTo(500);
+            await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status500InternalServerError);
 
-            var json = ToJsonElement(objectResult.Value);
-            await Assert.That(json.GetProperty("success").GetBoolean()).IsFalse();
-            await Assert.That(json.GetProperty("message").GetString()).IsEqualTo("Result cannot be null.");
+            var result = objectResult.Value as Result;
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result!.IsSuccess).IsFalse();
+            await Assert.That(result.Message).IsEqualTo("Result cannot be null.");
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
         }
 
         [Test]
@@ -93,9 +88,10 @@ namespace Tests.Other
             await Assert.That(objectResult).IsNotNull();
             await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status200OK);
 
-            var json = ToJsonElement(objectResult.Value);
-            await Assert.That(json.GetProperty("success").GetBoolean()).IsTrue();
-            await Assert.That(json.GetProperty("message").GetString()).IsEqualTo("Operation successful");
+            var actualResult = objectResult.Value as Result;
+            await Assert.That(actualResult).IsNotNull();
+            await Assert.That(actualResult!.IsSuccess).IsTrue();
+            await Assert.That(actualResult.Message).IsEqualTo("Operation successful");
         }
 
         [Test]
@@ -113,14 +109,14 @@ namespace Tests.Other
             await Assert.That(objectResult).IsNotNull();
             await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
 
-            var json = ToJsonElement(objectResult.Value);
-            await Assert.That(json.GetProperty("success").GetBoolean()).IsFalse();
-            await Assert.That(json.GetProperty("message").GetString()).IsEqualTo("Validation failed");
-            await Assert.That(json.GetProperty("errorCode").GetString()).IsEqualTo("VAL_001");
-
-            var errorElements = json.GetProperty("errors").EnumerateArray().Select(e => e.GetString()!).ToList();
-            await Assert.That(errorElements.Count).IsEqualTo(2);
-            await Assert.That(errorElements).Contains("Field is required");
+            var actualResult = objectResult.Value as Result;
+            await Assert.That(actualResult).IsNotNull();
+            await Assert.That(actualResult!.IsSuccess).IsFalse();
+            await Assert.That(actualResult.Message).IsEqualTo("Validation failed");
+            await Assert.That(actualResult.ErrorCode).IsEqualTo("VAL_001");
+            await Assert.That(actualResult.Errors).IsNotNull();
+            await Assert.That(actualResult.Errors!.Count).IsEqualTo(2);
+            await Assert.That(actualResult.Errors).Contains("Field is required");
         }
 
         // ─── HandleResult<T>(Result<T>) ───
@@ -129,8 +125,8 @@ namespace Tests.Other
         public async Task HandleResultGeneric_WhenSuccess_ReturnsDataPayload()
         {
             // Arrange
-            var payload = new { OrderId = 123, Total = 99.99m };
-            var result = Result<object>.Success("Data retrieved", StatusCodes.Status200OK, payload);
+            var payload = new TestPayload { OrderId = 123, Total = 99.99m };
+            var result = Result<TestPayload>.Success("Data retrieved", StatusCodes.Status200OK, payload);
 
             // Act
             var actionResult = _sut.ExecuteHandleResult(result);
@@ -140,13 +136,16 @@ namespace Tests.Other
             await Assert.That(objectResult).IsNotNull();
             await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status200OK);
 
-            var json = ToJsonElement(objectResult.Value);
-            await Assert.That(json.GetProperty("success").GetBoolean()).IsTrue();
-            await Assert.That(json.GetProperty("data").GetProperty("OrderId").GetInt32()).IsEqualTo(123);
+            var actualResult = objectResult.Value as Result<TestPayload>;
+            await Assert.That(actualResult).IsNotNull();
+            await Assert.That(actualResult!.IsSuccess).IsTrue();
+            await Assert.That(actualResult.Data).IsNotNull();
+            await Assert.That(actualResult.Data!.OrderId).IsEqualTo(123);
+            await Assert.That(actualResult.Data.Total).IsEqualTo(99.99m);
         }
 
         [Test]
-        public async Task HandleResultGeneric_WhenFailure_ReturnsErrorsAndOmitsData()
+        public async Task HandleResultGeneric_WhenFailure_ReturnsErrorsAndNullData()
         {
             // Arrange
             var result = Result<string>.Failure("Resource not found", "NOT_FOUND", StatusCodes.Status404NotFound);
@@ -159,14 +158,21 @@ namespace Tests.Other
             await Assert.That(objectResult).IsNotNull();
             await Assert.That(objectResult!.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
 
-            var json = ToJsonElement(objectResult.Value);
-            await Assert.That(json.GetProperty("success").GetBoolean()).IsFalse();
-            await Assert.That(json.GetProperty("errorCode").GetString()).IsEqualTo("NOT_FOUND");
-
-            await Assert.That(json.TryGetProperty("data", out _)).IsFalse();
+            var actualResult = objectResult.Value as Result<string>;
+            await Assert.That(actualResult).IsNotNull();
+            await Assert.That(actualResult!.IsSuccess).IsFalse();
+            await Assert.That(actualResult.ErrorCode).IsEqualTo("NOT_FOUND");
+            await Assert.That(actualResult.Data).IsNull();
         }
 
-        private class TestController : BaseControlle
+
+        private class TestPayload
+        {
+            public int OrderId { get; set; }
+            public decimal Total { get; set; }
+        }
+
+        private class TestController : BaseController
         {
             public Guid ExposedCurrentUserId => CurrentUserId;
 
