@@ -39,9 +39,11 @@ namespace Infrastructure
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
 
+            // httpclient
+            services.AddHttpClient<CountrySeeder>();
+
             // seeders
             services.AddScoped<UserSeeder>();
-            services.AddScoped<CountrySeeder>();
             services.AddScoped<PlaceSeeder>();
             services.AddScoped<TripSeeder>();
             services.AddScoped<InitialSeeder>();
