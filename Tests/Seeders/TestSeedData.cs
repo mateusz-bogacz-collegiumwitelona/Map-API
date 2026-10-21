@@ -183,6 +183,27 @@ public class TestSeedData
         await Assert.That(isLegnicaInPoland).IsTrue();
     }
 
+    [Test]
+    public async Task InitAsync_WhenDatabaseIsEmpty_ShouldSeedPlacesLinkedToCorrectCountries()
+    {
+        // Act
+        await Sut.InitAsync();
+
+        // Assert
+        var placesCount = await Context.Places.CountAsync();
+
+        // Assert
+        await Assert.That(placesCount).IsGreaterThanOrEqualTo(18);
+
+        var legnica = await Context.Places.Include(p => p.Country).FirstOrDefaultAsync(p => p.Name == "Legnica");
+        await Assert.That(legnica).IsNotNull();
+        await Assert.That(legnica!.Country).IsNotNull();
+        await Assert.That(legnica.Country.Name).IsEqualTo("Poland");
+        await Assert.That(legnica.Location.X).IsEqualTo(16.16);
+        await Assert.That(legnica.Location.Y).IsEqualTo(51.21);
+        await Assert.That(legnica.Location.SRID).IsEqualTo(4326);
+    }
+
     private class TestHostEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = Environments.Development;
