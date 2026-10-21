@@ -25,79 +25,73 @@ namespace Infrastructure.Seeders
                 return;
             }
 
-            _logger.LogInformation("Seeding extended travel destinations...");
+            _logger.LogInformation("Seeding travel destinations...");
 
+            var countryMap = await _context.Countries
+                .Select(c => new { c.Code, c.Id })
+                .ToDictionaryAsync(c => c.Code, c => c.Id);
 
-            var countries = await _context.Countries.ToListAsync();
-
-            Country? GetCountry(params string[] codes) =>
-                countries.FirstOrDefault(c => codes.Contains(c.Code, StringComparer.OrdinalIgnoreCase));
-
-            var pl = GetCountry("PL", "POL");
-            var de = GetCountry("DE", "DEU");
-            var es = GetCountry("ES", "ESP");
-            var cz = GetCountry("CZ", "CZE");
-            var it = GetCountry("IT", "ITA");
-            var fr = GetCountry("FR", "FRA");
-
-            if (pl == null || de == null || es == null || cz == null)
+            string[] requiredCodes = { "PL", "DE", "ES", "CZ" };
+            if (!requiredCodes.All(code => countryMap.ContainsKey(code)))
             {
                 _logger.LogError("Required countries (PL, DE, ES, CZ) not found in database.");
                 return;
             }
 
-            Place CreatePlace(string name, Country country, double lng, double lat) => new()
+            Place CreatePlace(string name, string countryCode, double lng, double lat) => new()
             {
                 Name = name,
-                CountryId = country.Id,
+                CountryId = countryMap[countryCode],
                 Location = new Point(lng, lat) { SRID = GeoConst.SRID }
             };
 
             var places = new List<Place>
             {
                 // PL
-                CreatePlace("Legnica", pl, 16.16, 51.21),
-                CreatePlace("Wrocław", pl, 17.03, 51.10),
-                CreatePlace("Warszawa", pl, 21.01, 52.23),
-                CreatePlace("Kraków", pl, 19.94, 50.06),
-                CreatePlace("Gdańsk", pl, 18.64, 54.35),
-                CreatePlace("Zakopane", pl, 19.95, 49.29),
+                CreatePlace("Legnica", "PL", 16.16, 51.21),
+                CreatePlace("Wrocław", "PL", 17.03, 51.10),
+                CreatePlace("Warszawa", "PL", 21.01, 52.23),
+                CreatePlace("Kraków", "PL", 19.94, 50.06),
+                CreatePlace("Gdańsk", "PL", 18.64, 54.35),
+                CreatePlace("Zakopane", "PL", 19.95, 49.29),
 
-                // DE
-                CreatePlace("Berlin", de, 13.40, 52.52),
-                CreatePlace("Drezno", de, 13.74, 51.05),
-                CreatePlace("Monachium", de, 11.58, 48.14),
-                CreatePlace("Hamburg", de, 9.99, 53.55),
+                // DE 
+                CreatePlace("Berlin", "DE", 13.40, 52.52),
+                CreatePlace("Drezno", "DE", 13.74, 51.05),
+                CreatePlace("Monachium", "DE", 11.58, 48.14),
+                CreatePlace("Hamburg", "DE", 9.99, 53.55),
 
-                // ES
-                CreatePlace("Palma de Mallorca", es, 2.65, 39.56),
-                CreatePlace("Alcudia", es, 3.12, 39.85),
-                CreatePlace("Sóller", es, 2.71, 39.76),
-                CreatePlace("Valldemossa", es, 2.62, 39.71),
-                CreatePlace("Barcelona", es, 2.17, 41.38),
-                CreatePlace("Madryt", es, -3.70, 40.41),
+                
+                // ES 
+                CreatePlace("Palma de Mallorca", "ES", 2.65, 39.56),
+                CreatePlace("Alcudia", "ES", 3.12, 39.85),
+                CreatePlace("Sóller", "ES", 2.71, 39.76),
+                CreatePlace("Valldemossa", "ES", 2.62, 39.71),
+                CreatePlace("Barcelona", "ES", 2.17, 41.38),
+                CreatePlace("Madryt", "ES", -3.70, 40.41),
 
-                CreatePlace("Praga", cz, 14.43, 50.07),
-                CreatePlace("Skalne Miasto Adršpach", cz, 16.12, 50.61),
-                CreatePlace("Brno", cz, 16.61, 49.19)
+                // CZ 
+                CreatePlace("Praga", "CZ", 14.43, 50.07),
+                CreatePlace("Skalne Miasto Adršpach", "CZ", 16.12, 50.61),
+                CreatePlace("Brno", "CZ", 16.61, 49.19)
             };
 
-            if (it != null)
+            if (countryMap.TryGetValue("IT", out var itId))
             {
-                places.Add(CreatePlace("Rzym", it, 12.49, 41.90));
-                places.Add(CreatePlace("Wenecja", it, 12.33, 45.44));
+                places.Add(new Place { Name = "Rzym", CountryId = itId, Location = new Point(12.49, 41.90) { SRID = GeoConst.SRID } });
+                places.Add(new Place { Name = "Wenecja", CountryId = itId, Location = new Point(12.33, 45.44) { SRID = GeoConst.SRID } });
             }
 
-            if (fr != null)
+            if (countryMap.TryGetValue("FR", out var frId))
             {
-                places.Add(CreatePlace("Paryż", fr, 2.35, 48.85));
-                places.Add(CreatePlace("Nicea", fr, 7.26, 43.71));
+                places.Add(new Place { Name = "Paryż", CountryId = frId, Location = new Point(2.35, 48.85) { SRID = GeoConst.SRID } });
+                places.Add(new Place { Name = "Nicea", CountryId = frId, Location = new Point(7.26, 43.71) { SRID = GeoConst.SRID } });
             }
 
             await _context.Places.AddRangeAsync(places);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Successfully seeded {Count} travel destinations across Europe!", places.Count);
+            _logger.LogInformation("Successfully seeded {Count} places.", places.Count);
         }
     }
 }

@@ -17,8 +17,7 @@ namespace Infrastructure.Seeders
         public TripSeeder(
             AppDbContext context,
             UserManager<User> userManager,
-            ILogger<TripSeeder> logger
-        )
+            ILogger<TripSeeder> logger)
         {
             _context = context;
             _userManager = userManager;
@@ -33,40 +32,46 @@ namespace Infrastructure.Seeders
                 return;
             }
 
-            _logger.LogInformation("Seeding trips (canonical for public, randomized for others, none for admin)...");
-
             var places = await _context.Places.Include(p => p.Country).ToDictionaryAsync(p => p.Name);
             var allPlacesList = places.Values.ToList();
-            var users = await _userManager.Users.ToListAsync();
+
+            if (allPlacesList.Count < 2)
+            {
+                _logger.LogWarning("Cannot seed trips: at least 2 places are required, but found {Count}.", allPlacesList.Count);
+                return;
+            }
+
+            _logger.LogInformation("Seeding trips and segments...");
 
             LineString CreateLine(Point p1, Point p2) =>
                 new LineString(new[] { p1.Coordinate, p2.Coordinate }) { SRID = GeoConst.SRID };
 
+            var publicUser = await _userManager.FindByEmailAsync("public@example.pl");
+            if (publicUser != null)
+            {
+                await SeedCanonicalTripsForPublicUserAsync(publicUser, places, CreateLine);
+            }
+
+            var regularUsers = await _userManager.Users
+                .Where(u => u.Email != "admin@example.pl" && u.Email != "public@example.pl")
+                .ToListAsync();
+
             var random = new Random(42);
 
-            foreach (var user in users)
+            foreach (var user in regularUsers)
             {
-                if (user.Email == "admin@example.pl")
-                {
-                    continue;
-                }
-
-                if (user.Email == "public@example.pl")
-                {
-                    await SeedCanonicalTripsForPublicUserAsync(user, places, CreateLine);
-                }
-                else
-                {
-                    await SeedRandomTripsForUserAsync(user, allPlacesList, CreateLine, random);
-                }
+                await SeedRandomTripsForUserAsync(user, allPlacesList, CreateLine, random);
             }
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Successfully seeded trips!");
         }
 
+
         private async Task SeedCanonicalTripsForPublicUserAsync(
-            User user, Dictionary<string, Place> places, Func<Point, Point, LineString> createLine)
+            User user, 
+            Dictionary<string, Place> places, 
+            Func<Point, Point, LineString> createLine)
         {
             var trip1 = new Trip
             {
@@ -82,101 +87,80 @@ namespace Infrastructure.Seeders
             {
                 new() {
                     Trip = trip1,
-                    OrderIndex = 0,
-                    TransportType = TransportTypeEnum.Car,
-                    OriginPlace = places["Legnica"],
-                    DestinationPlace = places["Berlin"],
+                    OrderIndex = 0, 
+                    TransportType = TransportTypeEnum.Car, 
+                    OriginPlace = places["Legnica"], 
+                    DestinationPlace = places["Berlin"], 
                     DistanceKm = 230.5m,
-                    Geometry = createLine(
-                        places["Legnica"].Location,
-                        places["Berlin"].Location
-                        )
+                    Geometry = createLine(places["Legnica"].Location, places["Berlin"].Location) 
                 },
-                new() {
-                    Trip = trip1,
-                    OrderIndex = 1,
+                new() { 
+                    Trip = trip1, 
+                    OrderIndex = 1, 
                     TransportType = TransportTypeEnum.Plane,
                     OriginPlace = places["Berlin"],
                     DestinationPlace = places["Palma de Mallorca"],
                     DistanceKm = 1650.0m,
-                    Geometry = createLine(
-                        places["Berlin"].Location,
-                        places["Palma de Mallorca"].Location
-                        )
+                    Geometry = createLine(places["Berlin"].Location, places["Palma de Mallorca"].Location)
                 },
-                new() {
-                    Trip = trip1,
-                    OrderIndex = 2,
+                new() { 
+                    Trip = trip1, 
+                    OrderIndex = 2, 
                     TransportType = TransportTypeEnum.Car,
-                    OriginPlace = places["Palma de Mallorca"],
+                    OriginPlace = places["Palma de Mallorca"], 
                     DestinationPlace = places["Valldemossa"],
-                    DistanceKm = 20.0m,
-                    Geometry = createLine(
-                        places["Palma de Mallorca"].Location,
-                        places["Valldemossa"].Location
-                        )
+                    DistanceKm = 20.0m, 
+                    Geometry = createLine(places["Palma de Mallorca"].Location, places["Valldemossa"].Location) 
                 },
-                new() {
-                    Trip = trip1,
-                    OrderIndex = 3,
-                    TransportType = TransportTypeEnum.Car,
-                    OriginPlace = places["Valldemossa"],
+                new() { 
+                    Trip = trip1, 
+                    OrderIndex = 3, 
+                    TransportType = TransportTypeEnum.Car, 
+                    OriginPlace = places["Valldemossa"], 
                     DestinationPlace = places["Sóller"],
-                    DistanceKm = 15.0m,
-                    Geometry = createLine(
-                        places["Valldemossa"].Location,
-                        places["Sóller"].Location
-                        )
+                    DistanceKm = 15.0m, 
+                    Geometry = createLine(places["Valldemossa"].Location, places["Sóller"].Location) 
                 },
-                new() {
-                    Trip = trip1,
+                new() { 
+                    Trip = trip1, 
                     OrderIndex = 4,
-                    TransportType = TransportTypeEnum.Car,
-                    OriginPlace = places["Sóller"],
+                    TransportType = TransportTypeEnum.Car, 
+                    OriginPlace = places["Sóller"], 
                     DestinationPlace = places["Alcudia"],
                     DistanceKm = 52.0m,
-                    Geometry = createLine(
-                        places["Sóller"].Location,
-                        places["Alcudia"].Location
-                        )
+                    Geometry = createLine(places["Sóller"].Location, places["Alcudia"].Location)
                 },
-                new() {
-                    Trip = trip1,
-                    OrderIndex = 5,
-                    TransportType = TransportTypeEnum.Car,
-                    OriginPlace = places["Alcudia"],
-                    DestinationPlace = places["Palma de Mallorca"],
-                    DistanceKm = 54.0m,
-                    Geometry = createLine(
-                        places["Alcudia"].Location,
-                        places["Palma de Mallorca"].Location
-                        )
+                new() { 
+                    Trip = trip1, 
+                    OrderIndex = 5, 
+                    TransportType = TransportTypeEnum.Car, 
+                    OriginPlace = places["Alcudia"], 
+                    DestinationPlace = places["Palma de Mallorca"], 
+                    DistanceKm = 54.0m, 
+                    Geometry = createLine(places["Alcudia"].Location, places["Palma de Mallorca"].Location) 
                 },
-                new() {
-                    Trip = trip1,
-                    OrderIndex = 6,
-                    TransportType = TransportTypeEnum.Plane,
+                new() { 
+                    Trip = trip1, 
+                    OrderIndex = 6, 
+                    TransportType = TransportTypeEnum.Plane, 
                     OriginPlace = places["Palma de Mallorca"],
-                    DestinationPlace = places["Berlin"],
+                    DestinationPlace = places["Berlin"], 
                     DistanceKm = 1650.0m,
-                    Geometry = createLine(
-                        places["Palma de Mallorca"].Location,
-                        places["Berlin"].Location
-                        )
+                    Geometry = createLine(places["Palma de Mallorca"].Location, places["Berlin"].Location) 
                 },
-                new() {
-                    Trip = trip1,
+                new() { 
+                    Trip = trip1, 
                     OrderIndex = 7,
                     TransportType = TransportTypeEnum.Car,
                     OriginPlace = places["Berlin"],
                     DestinationPlace = places["Legnica"],
                     DistanceKm = 230.5m,
-                    Geometry = createLine(places["Berlin"].Location, places["Legnica"].Location)
+                    Geometry = createLine(places["Berlin"].Location, places["Legnica"].Location) 
                 }
             };
             await _context.TripSegments.AddRangeAsync(segments1);
             AddVisitedCountries(user, trip1, segments1);
-
+            
             var trip2 = new Trip
             {
                 UserId = user.Id,
@@ -189,23 +173,20 @@ namespace Infrastructure.Seeders
 
             var segments2 = new List<TripSegment>
             {
-                new()
-                {
-                    Trip = trip2,
-                    OrderIndex = 0,
-                    TransportType = TransportTypeEnum.Train,
+                new() {
+                    Trip = trip2, 
+                    OrderIndex = 0, 
+                    TransportType = TransportTypeEnum.Train, 
                     OriginPlace = places["Wrocław"],
-                    DestinationPlace = places["Praga"],
-                    DistanceKm = 280.0m,
+                    DestinationPlace = places["Praga"], 
+                    DistanceKm = 280.0m, 
                     Geometry = createLine(
-                        places["Wrocław"].Location,
+                        places["Wrocław"].Location, 
                         places["Praga"].Location
-                    )
+                        ) 
                 },
-                new()
-                {
-                    Trip = trip2,
-                    OrderIndex = 1,
+                new() { Trip = trip2,
+                    OrderIndex = 1, 
                     TransportType = TransportTypeEnum.Other,
                     OriginPlace = places["Praga"],
                     DestinationPlace = places["Skalne Miasto Adršpach"],
@@ -213,11 +194,11 @@ namespace Infrastructure.Seeders
                     Geometry = createLine(
                         places["Praga"].Location,
                         places["Skalne Miasto Adršpach"].Location
-                        )
+                        ) 
                 },
-                new() {
-                    Trip = trip2,
-                    OrderIndex = 2,
+                new() { 
+                    Trip = trip2, 
+                    OrderIndex = 2, 
                     TransportType = TransportTypeEnum.Train,
                     OriginPlace = places["Skalne Miasto Adršpach"],
                     DestinationPlace = places["Wrocław"],
@@ -225,7 +206,7 @@ namespace Infrastructure.Seeders
                     Geometry = createLine(
                         places["Skalne Miasto Adršpach"].Location,
                         places["Wrocław"].Location
-                        )
+                        ) 
                 }
             };
             await _context.TripSegments.AddRangeAsync(segments2);
@@ -243,16 +224,17 @@ namespace Infrastructure.Seeders
 
             var segments3 = new List<TripSegment>
             {
-                new() {
-                    Trip = trip3, OrderIndex = 0,
+                new() { 
+                    Trip = trip3,
+                    OrderIndex = 0,
                     TransportType = TransportTypeEnum.Car,
                     OriginPlace = places["Wrocław"],
                     DestinationPlace = places["Zakopane"],
-                    DistanceKm = 360.0m,
+                    DistanceKm = 360.0m, 
                     Geometry = createLine(
-                        places["Wrocław"].Location,
+                        places["Wrocław"].Location, 
                         places["Zakopane"].Location
-                    )
+                        ) 
                 }
             };
             await _context.TripSegments.AddRangeAsync(segments3);
@@ -260,9 +242,20 @@ namespace Infrastructure.Seeders
         }
 
         private async Task SeedRandomTripsForUserAsync(
-            User user, List<Place> allPlaces, Func<Point, Point, LineString> createLine, Random rnd)
+            User user,
+            List<Place> allPlaces,
+            Func<Point, Point, LineString> createLine,
+            Random rnd)
         {
-            string[] tripThemes = { "Urlop objazdowy", "Weekendowa ucieczka", "Europejskie wakacje", "Wyprawa fotograficzna", "Wypad ze znajomymi" };
+            if (allPlaces.Count < 2) return;
+
+            string[] tripThemes = {
+                "Urlop objazdowy",
+                "Weekendowa ucieczka",
+                "Europejskie wakacje",
+                "Wyprawa fotograficzna",
+                "Wypad ze znajomymi"
+            };
 
             for (int t = 0; t < 3; t++)
             {
@@ -272,7 +265,9 @@ namespace Infrastructure.Seeders
                 var startDate = new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc);
                 int tripDurationDays = rnd.Next(3, 12);
 
-                var currentPlace = allPlaces[rnd.Next(allPlaces.Count)];
+                int currentIndex = rnd.Next(allPlaces.Count);
+                var currentPlace = allPlaces[currentIndex];
+
                 var trip = new Trip
                 {
                     UserId = user.Id,
@@ -288,14 +283,12 @@ namespace Infrastructure.Seeders
 
                 for (int order = 0; order < legsCount; order++)
                 {
-                    Place nextPlace;
-                    do
-                    {
-                        nextPlace = allPlaces[rnd.Next(allPlaces.Count)];
-                    } while (nextPlace.Id == currentPlace.Id);
+                    int offset = rnd.Next(1, allPlaces.Count);
+                    int nextIndex = (currentIndex + offset) % allPlaces.Count;
+                    var nextPlace = allPlaces[nextIndex];
 
                     var transport = (TransportTypeEnum)rnd.Next(4);
-                    decimal distance = Math.Round((decimal)Math.Max(35.0, currentPlace.Location.Distance(nextPlace.Location) * 90.0), 1);
+                    decimal distance = CalculateDistanceKm(currentPlace.Location, nextPlace.Location);
 
                     segments.Add(new TripSegment
                     {
@@ -309,6 +302,7 @@ namespace Infrastructure.Seeders
                         IsFallbackRoute = rnd.Next(10) == 0
                     });
 
+                    currentIndex = nextIndex;
                     currentPlace = nextPlace;
                 }
 
@@ -316,6 +310,7 @@ namespace Infrastructure.Seeders
                 AddVisitedCountries(user, trip, segments);
             }
         }
+
         private void AddVisitedCountries(User user, Trip trip, IEnumerable<TripSegment> segments)
         {
             var distinctCountryIds = segments
@@ -332,6 +327,23 @@ namespace Infrastructure.Seeders
                     Year = trip.StartDate.Year
                 });
             }
+        }
+
+        private static decimal CalculateDistanceKm(Point p1, Point p2)
+        {
+            const double earthRadiusKm = 6371.0; 
+            double dLat = (p2.Y - p1.Y) * Math.PI / 180.0;
+            double dLon = (p2.X - p1.X) * Math.PI / 180.0;
+
+            double lat1 = p1.Y * Math.PI / 180.0;
+            double lat2 = p2.Y * Math.PI / 180.0;
+
+            double a = Math.Sin(dLat / 2.0) * Math.Sin(dLat / 2.0) +
+                       Math.Cos(lat1) * Math.Cos(lat2) *
+                       Math.Sin(dLon / 2.0) * Math.Sin(dLon / 2.0);
+
+            double c = 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
+            return Math.Round((decimal)(earthRadiusKm * c), 1);
         }
     }
 }
