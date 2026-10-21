@@ -63,7 +63,7 @@ namespace Infrastructure.Seeders
                 CreatePlace("Gdańsk", pl, 18.64, 54.35),
                 CreatePlace("Zakopane", pl, 19.95, 49.29),
 
-                // EN
+                // DE
                 CreatePlace("Berlin", de, 13.40, 52.52),
                 CreatePlace("Drezno", de, 13.74, 51.05),
                 CreatePlace("Monachium", de, 11.58, 48.14),
