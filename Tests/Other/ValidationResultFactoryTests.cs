@@ -37,8 +37,6 @@ namespace Tests.Other
             );
         }
 
-        // ─── Testy: Wybór pierwszego kodu błędu ───────────────
-
         [Test]
         public async Task CreateActionResult_WhenValidationResultsHaveErrorCode_UsesFirstNonEmptyErrorCode()
         {
@@ -89,8 +87,6 @@ namespace Tests.Other
             await Assert.That(result.Errors).Contains("Hasło jest za krótkie");
         }
 
-        // ─── Testy: Fallback na ErrorCodes.ValidationError ────
-
         [Test]
         public async Task CreateActionResult_WhenNoErrorCodeDefined_FallsBackToDefaultValidationError()
         {
@@ -102,7 +98,6 @@ namespace Tests.Other
                 { "Name", new[] { "Pole jest wymagane" } }
             });
 
-            // Błąd bez podanego ErrorCode (string.Empty lub null)
             var validationResult = new ValidationResult(new[]
             {
                 new ValidationFailure("Name", "Pole jest wymagane") { ErrorCode = string.Empty }
