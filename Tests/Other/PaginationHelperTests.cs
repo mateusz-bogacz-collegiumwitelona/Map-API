@@ -156,24 +156,20 @@ namespace Tests.Other
         }
 
         [Test]
-        public async Task ToPagedResultAsync_WhenSourceIsNull_ReturnsFailure500()
+        public async Task ToPagedResultAsync_WhenSourceIsNull_ThrowsArgumentNullException()
         {
             // Arrange
             IQueryable<TestItem> nullSource = null!;
 
-            // Act
-            var result = await nullSource.ToPagedResultAsync(
-                number: 1,
-                size: 10,
-                logger: _logger
-            );
-
-            // Assert
-            await Assert.That(result.IsSuccess).IsFalse();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status500InternalServerError);
-            await Assert.That(result.Message).IsEqualTo("An error occurred while processing your request.");
-            await Assert.That(result.Errors).IsNotNull();
-            await Assert.That(result.Errors!.First()).Contains("Value cannot be null");
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await nullSource.ToPagedResultAsync(
+                    number: 1,
+                    size: 10,
+                    logger: _logger
+                );
+            }).Throws<ArgumentNullException>();
         }
 
         [Test]
@@ -193,6 +189,43 @@ namespace Tests.Other
                     cancellationToken: cts.Token
                 );
             }).Throws<OperationCanceledException>();
+        }
+
+        [Test]
+        public async Task ToPagedResultAsync_WhenNumberAndSizeAreZeroOrNegative_ClampsToMinimumValues()
+        {
+            // Act
+            var result = await _context.Items.ToPagedResultAsync(
+                number: -5,
+                size: 0,
+                logger: _logger
+            );
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            var paged = result.Data!;
+
+            await Assert.That(paged.PageNumber).IsEqualTo(1);
+            await Assert.That(paged.PageSize).IsEqualTo(1);
+            await Assert.That(paged.Items.Count).IsEqualTo(1);
+            await Assert.That(paged.TotalPages).IsEqualTo(25);
+        }
+
+        [Test]
+        public async Task ToPagedResultAsync_WhenSizeExceedsMaxLimit_ClampsTo100()
+        {
+            // Act
+            var result = await _context.Items.ToPagedResultAsync(
+                number: 1,
+                size: 500,
+                logger: _logger
+            );
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            var paged = result.Data!;
+
+            await Assert.That(paged.PageSize).IsEqualTo(100);
         }
 
         public class TestItem

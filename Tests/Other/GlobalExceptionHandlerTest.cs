@@ -126,7 +126,7 @@ namespace Tests.Other
         {
             // Arrange
             var context = CreateHttpContext();
-            var exception = new ArgumentException("Invalid parameter format.");
+            var exception = new ArgumentException("Internal sensitive argument error details");
 
             // Act
             var handled = await _handler.TryHandleAsync(context, exception, CancellationToken.None);
@@ -139,15 +139,15 @@ namespace Tests.Other
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(400);
             await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.BadRequest);
-            await Assert.That(response.Message).IsEqualTo("Invalid parameter format.");
+            await Assert.That(response.Message).IsEqualTo("Invalid argument provided.");
+            await Assert.That(response.Message).DoesNotContain("Internal sensitive");
         }
 
         [Test]
         public async Task TryHandleAsync_WhenInvalidOperationException_Returns500InternalServerError()
         {
-            // Arrange
             var context = CreateHttpContext();
-            var exception = new InvalidOperationException("Invalid operation state.");
+            var exception = new InvalidOperationException("Sensitive EF Core execution state error");
 
             // Act
             var handled = await _handler.TryHandleAsync(context, exception, CancellationToken.None);
@@ -160,7 +160,8 @@ namespace Tests.Other
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(500);
             await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
-            await Assert.That(response.Message).IsEqualTo("Invalid operation state.");
+            await Assert.That(response.Message).IsEqualTo("An unexpected error occurred. Please contact support.");
+            await Assert.That(response.Message).DoesNotContain("Sensitive EF Core");
         }
 
         [Test]
