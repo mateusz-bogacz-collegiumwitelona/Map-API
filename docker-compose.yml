@@ -27,6 +27,8 @@ services:
       - FRONTEND__URL=${ASPNETCORE_FRONTEND_URL}
       - TZ=UTC
       - SUPPORT_EMAIL=${MAIL_FROM} 
+      - SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
     ports:
       - "${ASPNETCORE_PORT:-8080}:8080"
     depends_on:

@@ -4,6 +4,7 @@ using Infrastructure;
 using Infrastructure.Seeders;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -70,6 +71,11 @@ public class TestSeedData
         var services = new ServiceCollection();
 
         services.AddLogging(builder => builder.AddConsole());
+
+        var configuration = new ConfigurationManager();
+        configuration["SEED_ADMIN_EMAIL"] = "admin@example.pl";
+        configuration["SEED_ADMIN_PASSWORD"] = "Admin123!";
+        services.AddSingleton<IConfiguration>(configuration);
 
         services.AddHttpClient();
         services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
@@ -171,19 +177,20 @@ public class TestSeedData
         // Act
         await Sut.InitAsync();
 
-        // Assert
+        // Assert 
         var countriesCount = await Context.Countries.CountAsync();
         await Assert.That(countriesCount).IsGreaterThan(150);
 
-        // Assert 
-        var poland = await Context.Countries.FirstOrDefaultAsync(c => c.Code == "PL" || c.Code == "POL");
+        var allCodes = await Context.Countries.Select(c => c.Code).ToListAsync();
+        await Assert.That(allCodes.All(code => code.Length == 2)).IsTrue();
+
+        var poland = await Context.Countries.FirstOrDefaultAsync(c => c.Code == "PL");
         await Assert.That(poland).IsNotNull();
         await Assert.That(poland!.Name).IsEqualTo("Poland");
         await Assert.That(poland.Boundary).IsNotNull();
         await Assert.That(poland.Boundary.SRID).IsEqualTo(4326);
 
         var legnicaPoint = new Point(16.16, 51.21) { SRID = 4326 };
-
         bool isLegnicaInPoland = poland.Boundary.Contains(legnicaPoint);
         await Assert.That(isLegnicaInPoland).IsTrue();
     }
