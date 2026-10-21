@@ -1,4 +1,5 @@
 ﻿using Domain.Models;
+using Infrastructure.Seeders;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -37,6 +38,15 @@ namespace Infrastructure
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
+
+            // httpclient
+            services.AddHttpClient<CountrySeeder>();
+
+            // seeders
+            services.AddScoped<UserSeeder>();
+            services.AddScoped<PlaceSeeder>();
+            services.AddScoped<TripSeeder>();
+            services.AddScoped<InitialSeeder>();
 
             return services;
         }

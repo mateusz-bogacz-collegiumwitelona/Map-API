@@ -12,7 +12,7 @@ namespace Infrastructure
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
         }
-        
+
         public DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<UserReport> UserReports { get; set; }
@@ -31,7 +31,7 @@ namespace Infrastructure
             builder.HasPostgresExtension("unaccent");
 
             builder.Entity<User>().ToTable("Users");
-            
+
             builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
             ConfigureSoftDeleteFilters(builder);
         }
