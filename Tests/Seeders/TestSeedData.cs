@@ -26,7 +26,7 @@ public class TestSeedData
     protected AppDbContext Context => _scope.ServiceProvider.GetRequiredService<AppDbContext>();
     protected UserManager<User> UserManager => _scope.ServiceProvider.GetRequiredService<UserManager<User>>();
     protected RoleManager<IdentityRole<Guid>> RoleManager => _scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-    protected SeedData Sut => _scope.ServiceProvider.GetRequiredService<SeedData>();
+    protected InitialSeeder Sut => _scope.ServiceProvider.GetRequiredService<InitialSeeder>();
 
     [Before(Class)]
     [Obsolete]
@@ -94,7 +94,11 @@ public class TestSeedData
         .AddEntityFrameworkStores<AppDbContext>()
         .AddDefaultTokenProviders();
 
-        services.AddScoped<SeedData>();
+        services.AddScoped<UserSeeder>();
+        services.AddScoped<CountrySeeder>();
+        services.AddScoped<PlaceSeeder>();
+        services.AddScoped<TripSeeder>();
+        services.AddScoped<InitialSeeder>();
 
         _serviceProvider = services.BuildServiceProvider();
         _scope = _serviceProvider.CreateScope();

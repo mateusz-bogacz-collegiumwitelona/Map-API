@@ -21,7 +21,7 @@ namespace Api.Configuration
                 await dbContext.Database.MigrateAsync();
 
                 logger.LogInformation("Initiating a data seeder...");
-                var seeder = services.GetRequiredService<SeedData>();
+                var seeder = services.GetRequiredService<InitialSeeder>();
                 await seeder.InitAsync();
 
                 logger.LogInformation("The database has been successfully migrated and initialized.");

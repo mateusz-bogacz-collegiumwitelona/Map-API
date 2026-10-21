@@ -39,7 +39,12 @@ namespace Infrastructure
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
 
-            services.AddScoped<SeedData>();
+            // seeders
+            services.AddScoped<UserSeeder>();
+            services.AddScoped<CountrySeeder>();
+            services.AddScoped<PlaceSeeder>();
+            services.AddScoped<TripSeeder>();
+            services.AddScoped<InitialSeeder>();
 
             return services;
         }
