@@ -1,6 +1,7 @@
 ﻿using Domain.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Services.Helpers
 {
@@ -10,6 +11,7 @@ namespace Services.Helpers
            this IQueryable<T> source,
            int? number,
            int? size,
+           ILogger logger,
            string entityName = "item",
            CancellationToken cancellationToken = default
            )
@@ -52,6 +54,8 @@ namespace Services.Helpers
                 TotalCount = totalCount,
                 TotalPages = totalPages
             };
+
+            logger.LogInformation("Retrieved {Count} {EntityName} (Page {PageNumber}/{TotalPages})", items.Count, entityName, pageNumber, totalPages);
 
             return Result<PagedResult<T>>.Success(
                 message: $"{entityName} retrieved successfully.",
