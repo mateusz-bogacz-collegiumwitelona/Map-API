@@ -51,15 +51,5 @@
                 Errors = errors ?? new List<string>(),
                 Data = data
             };
-
-        public static Result<T> Failure(string message, int statusCode, List<string>? errors = null, T? data = default)
-            => new Result<T>
-            {
-                Message = message,
-                StatusCode = statusCode,
-                IsSuccess = false,
-                Errors = errors ?? new List<string>(),
-                Data = data
-            };
     }
 }

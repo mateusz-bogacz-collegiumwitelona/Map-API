@@ -1,7 +1,6 @@
 ﻿using Domain.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Services.Helpers
 {
@@ -11,7 +10,6 @@ namespace Services.Helpers
            this IQueryable<T> source,
            int? number,
            int? size,
-           ILogger logger,
            string entityName = "item",
            CancellationToken cancellationToken = default
            )
