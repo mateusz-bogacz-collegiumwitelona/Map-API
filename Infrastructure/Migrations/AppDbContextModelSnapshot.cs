@@ -149,6 +149,9 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsRevoked")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasMaxLength(256)
