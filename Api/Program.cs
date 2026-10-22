@@ -1,6 +1,8 @@
 using Api.Configuration;
+using Api.Middlewares;
 using Infrastructure;
 using Serilog;
+using Services;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -15,6 +17,7 @@ try
 
     // Add services to the container.
     builder.Services.AddControllers();
+    builder.Services.AddHttpContextAccessor();
 
     // configs 
     builder.Services.AddCorsConfiguration(builder.Configuration);
@@ -23,8 +26,13 @@ try
     builder.Services.AddHealthCheckConfiguration();
     builder.Services.AddRoutingConfiguration();
     builder.Services.AddFluentValidationConfiguration();
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+    builder.Services.AddProblemDetails();
+    builder.Services.AddApplicationServices(builder.Configuration);
 
     var app = builder.Build();
+
+    app.UseExceptionHandler();
 
     // Auto-migrate database on startup
     await app.ApplyMigrationsAsync();
