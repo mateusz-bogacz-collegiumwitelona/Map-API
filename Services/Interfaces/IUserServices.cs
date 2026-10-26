@@ -6,7 +6,8 @@ namespace Services.Interfaces
 {
     public interface IUserServices
     {
-        Task<Result<UserResponse>> GetUserDataAsync(Guid userId);
+        Task<Result<UserResponse>> GetUserProfileAsync(Guid currentUserId, Guid? targetUserId = null);
         Task<Result> EditUserAsync(Guid userId, EditUserCommand command);
+
     }
 }

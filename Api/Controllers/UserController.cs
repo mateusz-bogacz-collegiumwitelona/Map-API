@@ -18,9 +18,11 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(Result<UserResponse>), StatusCodes.Status200OK)]
         [HttpGet]
         [Authorize(Roles = "User")]
-        public async Task<IActionResult> GetUserDataAsync([FromServices] IUserServices user)
+        public async Task<IActionResult> GetUserProfileAsync(
+            [FromRoute] Guid? userId,
+            [FromServices] IUserServices user)
         {
-            var result = await user.GetUserDataAsync(CurrentUserId);
+            var result = await user.GetUserProfileAsync(CurrentUserId, userId);
             return HandleResult(result);
         }
 

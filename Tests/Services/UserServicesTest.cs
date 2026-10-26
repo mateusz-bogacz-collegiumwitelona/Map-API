@@ -112,47 +112,93 @@ namespace Tests.Services
         }
         #endregion
 
-        #region GetUserDataAsync
+        #region GetUserProfileAsync
         [Test]
-        public async Task GetUserDataAsync_WhenUserExists_ShouldReturnSuccessResult()
+        public async Task GetUserProfileAsync_WhenTargetUserIdIsNull_ShouldReturnCurrentUserProfile()
         {
             // Arrange
-            var userId = Guid.NewGuid();
+            var currentUserId = Guid.NewGuid();
             var user = new User
             {
-                Id = userId,
+                Id = currentUserId,
                 FirstName = "Jan",
                 LastName = "Kowalski",
-                Bio = "Przykładowe bio"
+                Bio = "Moje bio",
+                IsPublic = false
             };
 
             await _contextMock.Users.AddAsync(user);
             await _contextMock.SaveChangesAsync();
 
-            // Act
-            var result = await _userServicesMock.GetUserDataAsync(userId);
+            // Act — brak targetUserId
+            var result = await _userServicesMock.GetUserProfileAsync(currentUserId, targetUserId: null);
 
             // Assert
-            await Assert.That(result).IsNotNull();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            await Assert.That(result.Message).IsEqualTo("User data retrieved successfully.");
-            await Assert.That(result.Data).IsNotNull();
-            await Assert.That(result.Data!.UserId).IsEqualTo(userId);
+            await Assert.That(result.Data!.UserId).IsEqualTo(currentUserId);
             await Assert.That(result.Data.FirstName).IsEqualTo("Jan");
-            await Assert.That(result.Data.LastName).IsEqualTo("Kowalski");
-            await Assert.That(result.Data.Bio).IsEqualTo("Przykładowe bio");
         }
 
         [Test]
-        public async Task GetUserDataAsync_WhenUserDoesNotExist_ShouldThrowNotFoundException()
+        public async Task GetUserProfileAsync_WhenTargetUserIsPrivateAndNotOwner_ShouldThrowForbiddenException()
         {
             // Arrange
-            var nonExistentUserId = Guid.NewGuid();
+            var ownerId = Guid.NewGuid();
+            var requesterId = Guid.NewGuid();
+
+            var privateUser = new User
+            {
+                Id = ownerId,
+                FirstName = "Piotr",
+                LastName = "Nowak",
+                IsPublic = false
+            };
+
+            await _contextMock.Users.AddAsync(privateUser);
+            await _contextMock.SaveChangesAsync();
 
             // Act & Assert
-            await Assert.That(async () => await _userServicesMock.GetUserDataAsync(nonExistentUserId))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{nonExistentUserId}' was not found.");
+            await Assert.That(async () => await _userServicesMock.GetUserProfileAsync(requesterId, ownerId))
+                .Throws<ForbiddenException>()
+                .WithMessage("This profile is private.");
+        }
+
+        [Test]
+        public async Task GetUserProfileAsync_WhenTargetUserIsPublic_ShouldReturnProfile()
+        {
+            // Arrange
+            var ownerId = Guid.NewGuid();
+            var requesterId = Guid.NewGuid();
+
+            var publicUser = new User
+            {
+                Id = ownerId,
+                FirstName = "Anna",
+                LastName = "Zielińska",
+                IsPublic = true
+            };
+
+            await _contextMock.Users.AddAsync(publicUser);
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.GetUserProfileAsync(requesterId, ownerId);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.FirstName).IsEqualTo("Anna");
+        }
+
+        [Test]
+        public async Task GetUserProfileAsync_WhenUserDoesNotExist_ShouldThrowNotFoundException()
+        {
+            // Arrange
+            var currentUserId = Guid.NewGuid();
+            var nonExistentId = Guid.NewGuid();
+
+            // Act & Assert
+            await Assert.That(async () => await _userServicesMock.GetUserProfileAsync(currentUserId, nonExistentId))
+                .Throws<NotFoundException>();
         }
         #endregion
 

@@ -31,9 +31,18 @@ namespace Services.Services
             _ctAccessor = ctAccessor;
         }
 
-        public async Task<Result<UserResponse>> GetUserDataAsync(Guid userId)
+        public async Task<Result<UserResponse>> GetUserProfileAsync(Guid currentUserId, Guid? targetUserId = null)
         {
-            var user = await GetUserAsync(userId);
+            var resolvedUserId = targetUserId ?? currentUserId;
+            var isOwner = resolvedUserId == currentUserId;
+
+            var user = await GetUserAsync(resolvedUserId);
+
+            if (!isOwner && !user.IsPublic)
+            {
+                _logger.LogWarning("User {CurrentUserId} attempted to view private profile {TargetUserId}.", currentUserId, resolvedUserId);
+                throw new ForbiddenException("This profile is private.");
+            }
 
             var response = new UserResponse
             {
@@ -41,6 +50,7 @@ namespace Services.Services
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 Bio = user.Bio,
+                IsPublic = user.IsPublic
             };
 
             return Result<UserResponse>.Success(
