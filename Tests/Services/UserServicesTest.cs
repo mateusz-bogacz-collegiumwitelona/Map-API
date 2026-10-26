@@ -1,4 +1,5 @@
 ﻿using Domain.Const;
+using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Infrastructure.Interceptors;
@@ -143,20 +144,15 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task GetUserDataAsync_WhenUserDoesNotExist_ShouldReturnNotFoundResult()
+        public async Task GetUserDataAsync_WhenUserDoesNotExist_ShouldThrowNotFoundException()
         {
             // Arrange
             var nonExistentUserId = Guid.NewGuid();
 
-            // Act
-            var result = await _userServicesMock.GetUserDataAsync(nonExistentUserId);
-
-            // Assert
-            await Assert.That(result).IsNotNull();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
-            await Assert.That(result.Message).IsEqualTo("User not found.");
-            await Assert.That(result.Data).IsNull();
+            // Act & Assert
+            await Assert.That(async () => await _userServicesMock.GetUserDataAsync(nonExistentUserId))
+                .Throws<NotFoundException>()
+                .WithMessage($"User with ID '{nonExistentUserId}' was not found.");
         }
         #endregion
 
@@ -272,7 +268,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task EditUserAsync_WhenUserDoesNotExist_ShouldReturnNotFoundResult()
+        public async Task EditUserAsync_WhenUserDoesNotExist_ShouldThrowNotFoundException()
         {
             // Arrange
             var nonExistentUserId = Guid.NewGuid();
@@ -283,14 +279,10 @@ namespace Tests.Services
                 Bio = "Bio"
             };
 
-            // Act
-            var result = await _userServicesMock.EditUserAsync(nonExistentUserId, command);
-
-            // Assert
-            await Assert.That(result).IsNotNull();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
-            await Assert.That(result.Message).IsEqualTo("User not found.");
+            // Act & Assert
+            await Assert.That(async () => await _userServicesMock.EditUserAsync(nonExistentUserId, command))
+                .Throws<NotFoundException>()
+                .WithMessage($"User with ID '{nonExistentUserId}' was not found.");
         }
         #endregion
     }

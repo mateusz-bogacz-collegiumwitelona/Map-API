@@ -1,5 +1,7 @@
 ﻿using Domain.Common;
 using Domain.Const;
+using Domain.Exceptions;
+using Domain.Models;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -31,16 +33,7 @@ namespace Services.Services
 
         public async Task<Result<UserResponse>> GetUserDataAsync(Guid userId)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
-            if (user == null)
-            {
-                _logger.LogWarning("User with ID {UserId} not found.", userId);
-                return Result<UserResponse>.Failure(
-                    message: $"User not found.",
-                    errorCode: ErrorCodes.NotFound,
-                    statusCode: StatusCodes.Status404NotFound
-                    );
-            }
+            var user = await GetUserAsync(userId);
 
             var response = new UserResponse
             {
@@ -59,16 +52,7 @@ namespace Services.Services
 
         public async Task<Result> EditUserAsync(Guid userId, EditUserCommand command)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
-            if (user == null)
-            {
-                _logger.LogWarning("User with ID {UserId} not found.", userId);
-                return Result.Failure(
-                    message: $"User not found.",
-                    errorCode: ErrorCodes.NotFound,
-                    statusCode: StatusCodes.Status404NotFound
-                    );
-            }
+            var user = await GetUserAsync(userId);
 
             if (!string.IsNullOrWhiteSpace(command.FirstName))
             {
@@ -89,5 +73,19 @@ namespace Services.Services
                 statusCode: StatusCodes.Status200OK
                 );
         }
+
+        private async Task<User> GetUserAsync(Guid userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                throw new NotFoundException($"User with ID '{userId}' was not found.");
+            }
+
+            return user;
+        }
+
+
     }
 }
