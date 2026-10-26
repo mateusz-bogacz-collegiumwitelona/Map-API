@@ -29,7 +29,7 @@ namespace Api.Middlewares
                 return true;
             }
 
-          
+
 
             var (statusCode, message, errorCode) = exception switch
             {

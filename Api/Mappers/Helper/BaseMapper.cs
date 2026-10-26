@@ -6,7 +6,7 @@ namespace Api.Mappers.Helper
     public abstract class BaseMapper
     {
         private static readonly TextInfo _textInfo = CultureInfo.InvariantCulture.TextInfo;
-        
+
         [UserMapping(Default = false)]
         protected static string? NormalizeNullableName(string? value)
         {

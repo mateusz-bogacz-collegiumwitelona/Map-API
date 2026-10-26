@@ -1,5 +1,4 @@
-﻿using Domain.Const;
-using Domain.Exceptions;
+﻿using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Infrastructure.Interceptors;

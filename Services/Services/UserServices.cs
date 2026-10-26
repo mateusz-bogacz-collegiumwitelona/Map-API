@@ -1,5 +1,4 @@
 ﻿using Domain.Common;
-using Domain.Const;
 using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
