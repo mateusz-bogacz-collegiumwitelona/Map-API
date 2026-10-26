@@ -1,4 +1,6 @@
-﻿using FluentValidation;
+﻿using Domain.Common;
+using Domain.Const;
+using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -9,18 +11,27 @@ namespace Api.Factory
     public class ValidationResultFactory : IFluentValidationAutoValidationResultFactory
     {
         public Task<IActionResult?> CreateActionResult(
-            ActionExecutingContext context,
-            ValidationProblemDetails validationProblemDetails,
-            IDictionary<IValidationContext, ValidationResult> validationResults)
+              ActionExecutingContext context,
+              ValidationProblemDetails validationProblemDetails,
+              IDictionary<IValidationContext, ValidationResult> validationResults
+              )
         {
-            var result = new BadRequestObjectResult(new
-            {
-                status = StatusCodes.Status400BadRequest,
-                title = "Validation errors occurred.",
-                errors = validationProblemDetails.Errors
-            });
+            var firstErrorCode = validationResults
+                .SelectMany(x => x.Value.Errors)
+                .Select(x => x.ErrorCode)
+                .FirstOrDefault(code => !string.IsNullOrEmpty(code)) ?? ErrorCodes.ValidationError;
 
-            return Task.FromResult<IActionResult?>(result);
+            var errors = validationProblemDetails.Errors
+               .SelectMany(x => x.Value)
+               .ToList() ?? new List<string>();
+
+            var result = Result<object>.Failure(
+                message: "Validation failed",
+                errorCode: firstErrorCode,
+                statusCode: StatusCodes.Status400BadRequest,
+                errors: errors);
+
+            return Task.FromResult<IActionResult?>(new BadRequestObjectResult(result));
         }
     }
 }
