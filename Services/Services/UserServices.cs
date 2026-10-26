@@ -84,6 +84,27 @@ namespace Services.Services
                 );
         }
 
+        public async Task<Result> SetProfileVisibilityAsync(Guid userId, bool isPublic)
+        {
+            var user = await GetUserAsync(userId);
+
+            if (user.IsPublic == isPublic)
+            {
+                return Result.Success(
+                    message: $"Profile visibility is already {(isPublic ? "public" : "private")}.",
+                    statusCode: StatusCodes.Status200OK
+                );
+            }
+
+            user.IsPublic = isPublic;
+            await _context.SaveChangesAsync(_ct);
+
+            return Result.Success(
+                message: $"Profile visibility updated to {(isPublic ? "public" : "private")}.",
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
         private async Task<User> GetUserAsync(Guid userId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
@@ -95,7 +116,5 @@ namespace Services.Services
 
             return user;
         }
-
-
     }
 }

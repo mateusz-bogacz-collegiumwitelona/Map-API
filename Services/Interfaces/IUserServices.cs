@@ -8,6 +8,7 @@ namespace Services.Interfaces
     {
         Task<Result<UserResponse>> GetUserProfileAsync(Guid currentUserId, Guid? targetUserId = null);
         Task<Result> EditUserAsync(Guid userId, EditUserCommand command);
+        Task<Result> SetProfileVisibilityAsync(Guid userId, bool isPublic);
 
     }
 }

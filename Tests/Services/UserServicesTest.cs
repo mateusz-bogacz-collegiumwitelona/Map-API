@@ -130,7 +130,7 @@ namespace Tests.Services
             await _contextMock.Users.AddAsync(user);
             await _contextMock.SaveChangesAsync();
 
-            // Act — brak targetUserId
+            // Act 
             var result = await _userServicesMock.GetUserProfileAsync(currentUserId, targetUserId: null);
 
             // Assert
@@ -327,6 +327,78 @@ namespace Tests.Services
 
             // Act & Assert
             await Assert.That(async () => await _userServicesMock.EditUserAsync(nonExistentUserId, command))
+                .Throws<NotFoundException>()
+                .WithMessage($"User with ID '{nonExistentUserId}' was not found.");
+        }
+        #endregion
+
+        #region SetProfileVisibilityAsync
+        [Test]
+        public async Task SetProfileVisibilityAsync_WhenVisibilityChanges_ShouldUpdateFlagAndSaveToDb()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var user = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                IsPublic = false
+            };
+
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.SetProfileVisibilityAsync(userId, isPublic: true);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("Profile visibility updated to public.");
+
+            var updatedUser = await _contextMock.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            await Assert.That(updatedUser).IsNotNull();
+            await Assert.That(updatedUser!.IsPublic).IsTrue();
+        }
+
+        [Test]
+        public async Task SetProfileVisibilityAsync_WhenVisibilityIsAlreadySet_ShouldReturnSuccessWithoutChangingState()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var user = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                IsPublic = true
+            };
+
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.SetProfileVisibilityAsync(userId, isPublic: true);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("Profile visibility is already public.");
+
+            var userInDb = await _contextMock.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            await Assert.That(userInDb).IsNotNull();
+            await Assert.That(userInDb!.IsPublic).IsTrue();
+        }
+
+        [Test]
+        public async Task SetProfileVisibilityAsync_WhenUserDoesNotExist_ShouldThrowNotFoundException()
+        {
+            // Arrange
+            var nonExistentUserId = Guid.NewGuid();
+
+            // Act & Assert
+            await Assert.That(async () => await _userServicesMock.SetProfileVisibilityAsync(nonExistentUserId, isPublic: true))
                 .Throws<NotFoundException>()
                 .WithMessage($"User with ID '{nonExistentUserId}' was not found.");
         }

@@ -39,5 +39,18 @@ namespace Api.Controllers
             var result = await user.EditUserAsync(CurrentUserId, mapper.MapEdit(request));
             return HandleResult(result);
         }
+
+        [EndpointSummary("Set profile visibility")]
+        [EndpointDescription("Set the profile visibility to public or private.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [HttpPatch("visibility/{isPublic:bool}")]
+        [Authorize(Roles = "User")]
+        public async Task<IActionResult> SetProfileVisibilityAsync(
+            [FromServices] IUserServices user,
+            [FromRoute] bool isPublic)
+        {
+            var result = await user.SetProfileVisibilityAsync(CurrentUserId, isPublic);
+            return HandleResult(result);
+        }
     }
 }
