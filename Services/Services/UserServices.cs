@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
+using Services.Command.User;
 using Services.Interfaces;
 using Services.Response.User;
 
@@ -19,7 +20,7 @@ namespace Services.Services
         private CancellationToken _ct => _ctAccessor.Token;
 
         public UserServices(
-            AppDbContext context, 
+            AppDbContext context,
             ILogger<UserServices> logger,
             ICancellationTokenAccessor ctAccessor)
         {
@@ -52,6 +53,39 @@ namespace Services.Services
             return Result<UserResponse>.Success(
                 message: "User data retrieved successfully.",
                 data: response,
+                statusCode: StatusCodes.Status200OK
+                );
+        }
+
+        public async Task<Result> EditUserAsync(Guid userId, EditUserCommand command)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result.Failure(
+                    message: $"User not found.",
+                    errorCode: ErrorCodes.NotFound,
+                    statusCode: StatusCodes.Status404NotFound
+                    );
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.FirstName))
+            {
+                user.FirstName = command.FirstName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(command.LastName))
+            {
+                user.LastName = command.LastName;
+            }
+
+            user.Bio = string.IsNullOrWhiteSpace(command.Bio) ? null : command.Bio;
+
+            await _context.SaveChangesAsync(_ct);
+
+            return Result.Success(
+                message: "User data updated successfully.",
                 statusCode: StatusCodes.Status200OK
                 );
         }

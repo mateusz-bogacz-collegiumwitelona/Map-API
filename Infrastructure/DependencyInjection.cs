@@ -1,4 +1,5 @@
 ﻿using Domain.Models;
+using Infrastructure.Interceptors;
 using Infrastructure.Seeders;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +20,13 @@ namespace Infrastructure
             dataSourceBuilder.UseNetTopologySuite();
             var dataSource = dataSourceBuilder.Build();
 
-            services.AddDbContext<AppDbContext>(options =>
+            services.AddDbContext<AppDbContext>((sp, options) =>
             {
                 options.UseNpgsql(dataSource, npgsqlOptions =>
                 {
                     npgsqlOptions.UseNetTopologySuite();
-                });
+                })
+                .AddInterceptors(sp.GetRequiredService<SoftDeleteInterceptor>());
             });
 
             // identity config

@@ -117,7 +117,7 @@ namespace Infrastructure.Seeders
                                 _ => existing.Boundary
                             };
                             existing.Boundary.SRID = GeoConst.SRID;
-                            continue; 
+                            continue;
                         }
 
                         string name = GetAttribute(feature.Attributes, "name", "ADMIN", "NAME", "NAME_EN") ?? "Unknown";

@@ -1,5 +1,5 @@
 ﻿using Domain.Models;
-using Domain.Models.Base;
+using Domain.Models.Base.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -40,18 +40,16 @@ namespace Infrastructure
         {
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
-                if (typeof(BaseDeletableEntity).IsAssignableFrom(entityType.ClrType))
+                if (typeof(ISoftDeletableEntity).IsAssignableFrom(entityType.ClrType))
                 {
                     var parameter = Expression.Parameter(entityType.ClrType, "e");
-                    var property = Expression.Property(parameter, nameof(BaseDeletableEntity.IsDeleted));
+                    var property = Expression.Property(parameter, nameof(ISoftDeletableEntity.IsDeleted));
                     var compare = Expression.Equal(property, Expression.Constant(false));
                     var lambda = Expression.Lambda(compare, parameter);
 
                     builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
                 }
             }
-
-            builder.Entity<User>().HasQueryFilter(u => !u.IsDeleted);
         }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

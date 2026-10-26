@@ -1,24 +1,24 @@
 ﻿using Domain.Const;
 using Domain.Models;
 using Infrastructure;
+using Infrastructure.Interceptors;
 using Microsoft.AspNetCore.Http;
-using Microsoft.CodeCoverage.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Services.Accessors.Interfaces;
+using Services.Command.User;
 using Services.Interfaces;
 using Services.Services;
 using Testcontainers.PostgreSql;
 using Tests.Fakes;
-using TUnit.Core.Interfaces;
 
 namespace Tests.Services
 {
     public class UserServicesTest
     {
+        #region Configuration and Setup
         protected AppDbContext _contextMock = null!;
-
         private static PostgreSqlContainer _dbContainer = null!;
         private static string _connectionString = null!;
 
@@ -79,6 +79,7 @@ namespace Tests.Services
                     options.UseNetTopologySuite();
                     options.MigrationsHistoryTable("__EFMigrationsHistory", _currentSchema);
                 })
+               .AddInterceptors(new SoftDeleteInterceptor())
                .LogTo(Console.WriteLine, LogLevel.Warning)
                .EnableSensitiveDataLogging()
                .EnableDetailedErrors()
@@ -108,7 +109,9 @@ namespace Tests.Services
             cmd.CommandText = $"DROP SCHEMA IF EXISTS {_currentSchema} CASCADE;";
             await cmd.ExecuteNonQueryAsync();
         }
+        #endregion
 
+        #region GetUserDataAsync
         [Test]
         public async Task GetUserDataAsync_WhenUserExists_ShouldReturnSuccessResult()
         {
@@ -155,5 +158,140 @@ namespace Tests.Services
             await Assert.That(result.Message).IsEqualTo("User not found.");
             await Assert.That(result.Data).IsNull();
         }
+        #endregion
+
+        #region EditUserAsync
+        [Test]
+        public async Task EditUserAsync_WhenUserExists_ShouldUpdateAllProvidedFields()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var initialUser = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                Bio = "Stare bio"
+            };
+
+            await _contextMock.Users.AddAsync(initialUser);
+            await _contextMock.SaveChangesAsync();
+
+            var command = new EditUserCommand
+            {
+                FirstName = "Piotr",
+                LastName = "Nowak",
+                Bio = "Nowe zaktualizowane bio"
+            };
+
+            // Act
+            var result = await _userServicesMock.EditUserAsync(userId, command);
+
+            // Assert 
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("User data updated successfully.");
+
+            var updatedUser = await _contextMock.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            await Assert.That(updatedUser).IsNotNull();
+            await Assert.That(updatedUser!.FirstName).IsEqualTo("Piotr");
+            await Assert.That(updatedUser.LastName).IsEqualTo("Nowak");
+            await Assert.That(updatedUser.Bio).IsEqualTo("Nowe zaktualizowane bio");
+        }
+
+        [Test]
+        public async Task EditUserAsync_WhenOnlySomeFieldsProvided_ShouldOnlyUpdateProvidedFields()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var initialUser = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                Bio = "Oryginalne bio"
+            };
+
+            await _contextMock.Users.AddAsync(initialUser);
+            await _contextMock.SaveChangesAsync();
+
+            var command = new EditUserCommand
+            {
+                FirstName = "Tomasz",
+                LastName = null,
+                Bio = "Oryginalne bio"
+            };
+
+            // Act
+            var result = await _userServicesMock.EditUserAsync(userId, command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+
+            var updatedUser = await _contextMock.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            await Assert.That(updatedUser).IsNotNull();
+            await Assert.That(updatedUser!.FirstName).IsEqualTo("Tomasz");
+            await Assert.That(updatedUser.LastName).IsEqualTo("Kowalski");
+            await Assert.That(updatedUser.Bio).IsEqualTo("Oryginalne bio");
+        }
+
+        [Test]
+        public async Task EditUserAsync_WhenBioIsEmptyOrWhitespace_ShouldSetBioToNull()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var initialUser = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                Bio = "Stare bio do usunięcia"
+            };
+
+            await _contextMock.Users.AddAsync(initialUser);
+            await _contextMock.SaveChangesAsync();
+
+            var command = new EditUserCommand
+            {
+                FirstName = null,
+                LastName = null,
+                Bio = "   "
+            };
+
+            // Act
+            var result = await _userServicesMock.EditUserAsync(userId, command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+
+            var updatedUser = await _contextMock.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            await Assert.That(updatedUser).IsNotNull();
+            await Assert.That(updatedUser!.Bio).IsNull();
+            await Assert.That(updatedUser.FirstName).IsEqualTo("Jan");
+            await Assert.That(updatedUser.LastName).IsEqualTo("Kowalski");
+        }
+
+        [Test]
+        public async Task EditUserAsync_WhenUserDoesNotExist_ShouldReturnNotFoundResult()
+        {
+            // Arrange
+            var nonExistentUserId = Guid.NewGuid();
+            var command = new EditUserCommand
+            {
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                Bio = "Bio"
+            };
+
+            // Act
+            var result = await _userServicesMock.EditUserAsync(nonExistentUserId, command);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User not found.");
+        }
+        #endregion
     }
 }
