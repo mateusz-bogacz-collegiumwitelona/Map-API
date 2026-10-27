@@ -15,18 +15,19 @@ namespace Infrastructure
             this IServiceCollection services,
             IConfiguration configuration)
         {
+            // database config
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
             dataSourceBuilder.UseNetTopologySuite();
             var dataSource = dataSourceBuilder.Build();
 
-            services.AddDbContext<AppDbContext>((sp, options) =>
+            services.AddDbContext<AppDbContext>(options =>
             {
                 options.UseNpgsql(dataSource, npgsqlOptions =>
                 {
                     npgsqlOptions.UseNetTopologySuite();
-                })
-                .AddInterceptors(sp.GetRequiredService<SoftDeleteInterceptor>());
+                });
+                options.AddInterceptors(new SoftDeleteInterceptor());
             });
 
             // identity config
