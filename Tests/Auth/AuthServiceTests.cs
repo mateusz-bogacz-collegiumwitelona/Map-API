@@ -29,6 +29,7 @@ namespace Tests.Auth
         private AppDbContext Context => _scope.ServiceProvider.GetRequiredService<AppDbContext>();
         private UserManager<User> UserManager => _scope.ServiceProvider.GetRequiredService<UserManager<User>>();
         private RoleManager<IdentityRole<Guid>> RoleManager => _scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        private CountingPasswordHasher CountingHasher => _scope.ServiceProvider.GetRequiredService<CountingPasswordHasher>();
         private IAuthService Sut => _scope.ServiceProvider.GetRequiredService<IAuthService>();
 
         [Before(Test)]
@@ -59,6 +60,9 @@ namespace Tests.Auth
             })
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
+
+            services.AddScoped<CountingPasswordHasher>();
+            services.AddScoped<IPasswordHasher<User>>(provider => provider.GetRequiredService<CountingPasswordHasher>());
 
             services.Configure<JwtOptions>(options =>
             {
@@ -162,6 +166,21 @@ namespace Tests.Auth
             await Assert.That(wrongPasswordResult.Data).IsNull();
 
             await Assert.That(await Context.RefreshTokens.CountAsync()).IsEqualTo(0);
+        }
+
+        [Test]
+        public async Task LoginAsync_WhenCredentialsAreInvalid_PerformsPasswordVerificationForBothPaths()
+        {
+            // Arrange
+            var user = await CreateUserAsync("timing@example.com");
+            var hasher = CountingHasher;
+
+            // Act
+            await Sut.LoginAsync("missing@example.com", Password);
+            await Sut.LoginAsync(user.Email!, "WrongPassword123!");
+
+            // Assert
+            await Assert.That(hasher.VerifyCount).IsGreaterThan(1);
         }
 
         [Test]
@@ -307,6 +326,26 @@ namespace Tests.Auth
             }
 
             return user;
+        }
+
+        private sealed class CountingPasswordHasher : IPasswordHasher<User>
+        {
+            private readonly PasswordHasher<User> _inner = new();
+
+            public int VerifyCount { get; private set; }
+
+            public string HashPassword(User user, string password)
+                => _inner.HashPassword(user, password);
+
+            public PasswordVerificationResult VerifyHashedPassword(
+                User user,
+                string hashedPassword,
+                string providedPassword)
+            {
+                VerifyCount++;
+
+                return _inner.VerifyHashedPassword(user, hashedPassword, providedPassword);
+            }
         }
     }
 }

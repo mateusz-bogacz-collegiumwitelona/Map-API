@@ -10,6 +10,9 @@ namespace Services.Services.Auth
 {
     public class AuthService : IAuthService
     {
+        private static readonly string DummyPasswordHash =
+            new PasswordHasher<User>().HashPassword(new User(), "dummy-password-not-used");
+
         private readonly UserManager<User> _userManager;
         private readonly ITokenService _tokenService;
 
@@ -26,12 +29,16 @@ namespace Services.Services.Auth
         {
             var user = await _userManager.FindByEmailAsync(email);
 
-            if (user is null || !await _userManager.CheckPasswordAsync(user, password))
+            if (user is null)
             {
-                return Result<AuthResponse>.Failure(
-                    message: "Invalid email or password.",
-                    errorCode: ErrorCodes.InvalidCredentials,
-                    statusCode: StatusCodes.Status401Unauthorized);
+                _userManager.PasswordHasher.VerifyHashedPassword(new User(), DummyPasswordHash, password);
+
+                return InvalidCredentials();
+            }
+
+            if (!await _userManager.CheckPasswordAsync(user, password))
+            {
+                return InvalidCredentials();
             }
 
             if (!user.EmailConfirmed)
@@ -82,6 +89,12 @@ namespace Services.Services.Auth
                 message: "Logged out successfully.",
                 statusCode: StatusCodes.Status200OK);
         }
+
+        private static Result<AuthResponse> InvalidCredentials()
+            => Result<AuthResponse>.Failure(
+                message: "Invalid email or password.",
+                errorCode: ErrorCodes.InvalidCredentials,
+                statusCode: StatusCodes.Status401Unauthorized);
 
         private async Task<Result<AuthResponse>> CreateAuthResponseAsync(User user, CancellationToken cancellationToken)
         {
