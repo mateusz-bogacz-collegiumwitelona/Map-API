@@ -113,13 +113,13 @@ namespace Services.Services.Auth
 
         private SymmetricSecurityKey CreateSigningKey()
         {
-            if (string.IsNullOrWhiteSpace(_options.Key) || Encoding.UTF8.GetByteCount(_options.Key) < 32)
+            if (string.IsNullOrWhiteSpace(_options.SecretKey) || Encoding.UTF8.GetByteCount(_options.SecretKey) < 32)
             {
                 throw new InvalidOperationException(
-                    "JWT signing key is missing or too short. Configure JWT:KEY with at least 32 characters.");
+                    "JWT signing key is missing or too short. Configure JWT:SECRETKEY with at least 32 characters.");
             }
 
-            return new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key));
+            return new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));
         }
 
         private static void Revoke(RefreshToken refreshToken)

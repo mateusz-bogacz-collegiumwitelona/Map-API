@@ -26,6 +26,8 @@ try
     builder.Services.AddHealthCheckConfiguration();
     builder.Services.AddRoutingConfiguration();
     builder.Services.AddFluentValidationConfiguration();
+    builder.Services.AddAuthenticationConfiguration(builder.Configuration);
+    builder.Services.AddAuthorizationConfiguration();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
     builder.Services.AddApplicationServices(builder.Configuration);
@@ -46,6 +48,8 @@ try
     app.UseHttpsRedirection();
 
     app.UseCorsConfiguration();
+
+    app.UseAuthentication();
 
     app.UseAuthorization();
 
