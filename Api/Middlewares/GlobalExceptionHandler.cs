@@ -32,11 +32,11 @@ namespace Api.Middlewares
 
             var (statusCode, message, errorCode) = exception switch
             {
-                DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The data has been modified by another user. Please refresh and try again.", ErrorCodes.InvalidOperation),
-                KeyNotFoundException => (StatusCodes.Status404NotFound, "Resource not found.", ErrorCodes.NotFound),
-                ArgumentException => (StatusCodes.Status400BadRequest, "Invalid argument provided.", ErrorCodes.BadRequest),
-                InvalidOperationException => (StatusCodes.Status500InternalServerError, "An unexpected error occurred. Please contact support.", ErrorCodes.InternalError),
-                _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred. Please contact support.", ErrorCodes.InternalError)
+                DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The data has been modified by another user. Please refresh and try again.", ErrorCodes.Common.InvalidOperation),
+                KeyNotFoundException => (StatusCodes.Status404NotFound, "Resource not found.", ErrorCodes.Common.NotFound),
+                ArgumentException => (StatusCodes.Status400BadRequest, "Invalid argument provided.", ErrorCodes.Common.BadRequest),
+                InvalidOperationException => (StatusCodes.Status500InternalServerError, "An unexpected error occurred. Please contact support.", ErrorCodes.Common.InternalError),
+                _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred. Please contact support.", ErrorCodes.Common.InternalError)
             };
 
             var result = Result.Failure(

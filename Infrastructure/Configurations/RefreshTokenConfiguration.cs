@@ -15,6 +15,8 @@ namespace Infrastructure.Configurations
                 .IsRequired();
 
             builder.HasIndex(t => t.Token).IsUnique();
+            builder.Property(t => t.IsRevoked)
+                .IsConcurrencyToken();
 
             builder.HasOne(t => t.User)
                 .WithMany()

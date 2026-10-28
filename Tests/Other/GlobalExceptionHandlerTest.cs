@@ -96,7 +96,7 @@ namespace Tests.Other
 
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(409);
-            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.InvalidOperation);
+            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.Common.InvalidOperation);
             await Assert.That(response.Message).IsEqualTo("The data has been modified by another user. Please refresh and try again.");
         }
 
@@ -117,7 +117,7 @@ namespace Tests.Other
 
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(404);
-            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.Common.NotFound);
             await Assert.That(response.Message).IsEqualTo("Resource not found.");
         }
 
@@ -138,7 +138,7 @@ namespace Tests.Other
 
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(400);
-            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.BadRequest);
+            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.Common.BadRequest);
             await Assert.That(response.Message).IsEqualTo("Invalid argument provided.");
             await Assert.That(response.Message).DoesNotContain("Internal sensitive");
         }
@@ -159,7 +159,7 @@ namespace Tests.Other
 
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(500);
-            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
+            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.Common.InternalError);
             await Assert.That(response.Message).IsEqualTo("An unexpected error occurred. Please contact support.");
             await Assert.That(response.Message).DoesNotContain("Sensitive EF Core");
         }
@@ -182,7 +182,7 @@ namespace Tests.Other
 
             await Assert.That(response).IsNotNull();
             await Assert.That(response!.StatusCode).IsEqualTo(500);
-            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
+            await Assert.That(response.ErrorCode).IsEqualTo(ErrorCodes.Common.InternalError);
             await Assert.That(response.Message).IsEqualTo("An unexpected error occurred. Please contact support.");
 
             await Assert.That(response.Message).DoesNotContain("secret_data");

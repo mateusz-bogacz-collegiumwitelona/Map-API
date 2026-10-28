@@ -8,7 +8,6 @@ using Services.Options;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Services.Services.Auth
 {
@@ -44,7 +43,7 @@ namespace Services.Services.Auth
                 claims: claims,
                 notBefore: issuedAt,
                 expires: expiresAt,
-                signingCredentials: new SigningCredentials(CreateSigningKey(), SecurityAlgorithms.HmacSha256));
+                signingCredentials: new SigningCredentials(_options.GetSigningKey(), SecurityAlgorithms.HmacSha256));
 
             return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
         }
@@ -67,59 +66,68 @@ namespace Services.Services.Auth
             return refreshToken;
         }
 
-        public async Task<RefreshToken?> GetActiveRefreshTokenAsync(string token, CancellationToken cancellationToken = default)
+        public async Task<RefreshToken?> ConsumeRefreshTokenAsync(string token, CancellationToken cancellationToken = default)
         {
             var now = DateTime.UtcNow;
 
-            return await _context.RefreshTokens
+            var refreshToken = await _context.RefreshTokens
                 .Include(t => t.User)
                 .FirstOrDefaultAsync(
                     t => t.Token == token && !t.IsRevoked && t.ExpiredAt > now,
                     cancellationToken);
-        }
 
-        public async Task RevokeRefreshTokenAsync(string token, CancellationToken cancellationToken = default)
-        {
-            var refreshToken = await _context.RefreshTokens
-                .FirstOrDefaultAsync(t => t.Token == token, cancellationToken);
-
-            if (refreshToken is null || refreshToken.IsRevoked)
+            if (refreshToken is null)
             {
-                return;
+                return null;
             }
 
             Revoke(refreshToken);
-            await _context.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                // IsRevoked is an optimistic concurrency token, so this update only succeeds
+                // while the token is still active in the database.
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _context.Entry(refreshToken).State = EntityState.Detached;
+                return null;
+            }
+
+            return refreshToken;
+        }
+
+        public async Task<bool> RevokeRefreshTokenAsync(string token, CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+
+            // Conditional update keeps revocation atomic: only one concurrent request can affect the row.
+            var rowsAffected = await _context.RefreshTokens
+                .Where(t => t.Token == token && !t.IsRevoked)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(t => t.IsRevoked, true)
+                        .SetProperty(t => t.RevokedAt, now)
+                        .SetProperty(t => t.UpdatedAt, now),
+                    cancellationToken);
+
+            return rowsAffected > 0;
         }
 
         public async Task RevokeAllUserRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            var refreshTokens = await _context.RefreshTokens
+            var now = DateTime.UtcNow;
+
+            // Bulk update avoids loading every active token into memory.
+            await _context.RefreshTokens
                 .Where(t => t.UserId == userId && !t.IsRevoked)
-                .ToListAsync(cancellationToken);
-
-            if (refreshTokens.Count == 0)
-            {
-                return;
-            }
-
-            foreach (var refreshToken in refreshTokens)
-            {
-                Revoke(refreshToken);
-            }
-
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-
-        private SymmetricSecurityKey CreateSigningKey()
-        {
-            if (string.IsNullOrWhiteSpace(_options.SecretKey) || Encoding.UTF8.GetByteCount(_options.SecretKey) < 32)
-            {
-                throw new InvalidOperationException(
-                    "JWT signing key is missing or too short. Configure JWT:SECRETKEY with at least 32 characters.");
-            }
-
-            return new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(t => t.IsRevoked, true)
+                        .SetProperty(t => t.RevokedAt, now)
+                        .SetProperty(t => t.UpdatedAt, now),
+                    cancellationToken);
         }
 
         private static void Revoke(RefreshToken refreshToken)

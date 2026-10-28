@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Services.Options;
-using System.Text;
 
 namespace Api.Configuration
 {
@@ -14,7 +13,10 @@ namespace Api.Configuration
             var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
                 ?? throw new InvalidOperationException("JWT configuration section is missing.");
 
-            Validate(jwtOptions);
+            if (!JwtOptionsValidation.IsValid(jwtOptions))
+            {
+                throw new InvalidOperationException(JwtOptionsValidation.ErrorMessage);
+            }
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
@@ -27,24 +29,12 @@ namespace Api.Configuration
                         ValidAudience = jwtOptions.Audience,
                         ValidateLifetime = true,
                         ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
+                        IssuerSigningKey = jwtOptions.GetSigningKey(),
                         ClockSkew = TimeSpan.Zero
                     };
                 });
 
             return services;
-        }
-
-        private static void Validate(JwtOptions jwtOptions)
-        {
-            if (string.IsNullOrWhiteSpace(jwtOptions.Issuer) ||
-                string.IsNullOrWhiteSpace(jwtOptions.Audience) ||
-                string.IsNullOrWhiteSpace(jwtOptions.SecretKey) ||
-                Encoding.UTF8.GetByteCount(jwtOptions.SecretKey) < 32)
-            {
-                throw new InvalidOperationException(
-                    "JWT configuration is incomplete. Configure JWT:ISSUER, JWT:AUDIENCE, and JWT:SECRETKEY with at least 32 characters.");
-            }
         }
     }
 }

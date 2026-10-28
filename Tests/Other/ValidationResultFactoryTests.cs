@@ -117,7 +117,7 @@ namespace Tests.Other
 
             var result = badRequestResult!.Value as Result<object>;
             await Assert.That(result).IsNotNull();
-            await Assert.That(result!.ErrorCode).IsEqualTo(ErrorCodes.ValidationError);
+            await Assert.That(result!.ErrorCode).IsEqualTo(ErrorCodes.Validation.ValidationError);
         }
 
         [Test]
@@ -137,7 +137,7 @@ namespace Tests.Other
 
             var result = badRequestResult!.Value as Result<object>;
             await Assert.That(result).IsNotNull();
-            await Assert.That(result!.ErrorCode).IsEqualTo(ErrorCodes.ValidationError);
+            await Assert.That(result!.ErrorCode).IsEqualTo(ErrorCodes.Validation.ValidationError);
             await Assert.That(result.Errors).IsEmpty();
         }
     }

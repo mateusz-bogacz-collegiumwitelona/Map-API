@@ -25,9 +25,11 @@ try
     builder.Services.AddSwaggerConfiguration();
     builder.Services.AddHealthCheckConfiguration();
     builder.Services.AddRoutingConfiguration();
+    builder.Services.AddMapperConfiguration();
     builder.Services.AddFluentValidationConfiguration();
     builder.Services.AddAuthenticationConfiguration(builder.Configuration);
     builder.Services.AddAuthorizationConfiguration();
+    builder.Services.AddRateLimitingConfiguration();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
     builder.Services.AddApplicationServices(builder.Configuration);
@@ -48,6 +50,10 @@ try
     app.UseHttpsRedirection();
 
     app.UseCorsConfiguration();
+
+    app.UseRouting();
+
+    app.UseRateLimitingConfiguration();
 
     app.UseAuthentication();
 

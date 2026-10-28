@@ -1,4 +1,7 @@
 namespace Api.Request.Auth
 {
-    public sealed record LogoutRequest(string RefreshToken);
+    public sealed record LogoutRequest
+    {
+        public required string RefreshToken { get; init; }
+    }
 }

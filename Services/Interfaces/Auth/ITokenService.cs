@@ -10,9 +10,9 @@ namespace Services.Interfaces.Auth
 
         Task<RefreshToken> CreateRefreshTokenAsync(Guid userId, CancellationToken cancellationToken = default);
 
-        Task<RefreshToken?> GetActiveRefreshTokenAsync(string token, CancellationToken cancellationToken = default);
+        Task<RefreshToken?> ConsumeRefreshTokenAsync(string token, CancellationToken cancellationToken = default);
 
-        Task RevokeRefreshTokenAsync(string token, CancellationToken cancellationToken = default);
+        Task<bool> RevokeRefreshTokenAsync(string token, CancellationToken cancellationToken = default);
 
         Task RevokeAllUserRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default);
     }

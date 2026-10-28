@@ -16,7 +16,11 @@ namespace Services
             // Example: services.AddScoped<IMyService, MyService>();
             services.AddScoped<ICancellationTokenAccessor, HttpCancellationTokenAccessor>();
 
-            services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+            services.AddOptions<JwtOptions>()
+                .Bind(configuration.GetSection(JwtOptions.SectionName))
+                .Validate(JwtOptionsValidation.IsValid, JwtOptionsValidation.ErrorMessage)
+                .ValidateOnStart();
+
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IAuthService, AuthService>();
 

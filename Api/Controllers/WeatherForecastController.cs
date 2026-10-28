@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
@@ -12,6 +13,8 @@ namespace Api.Controllers
         ];
 
         [HttpGet(Name = "GetWeatherForecast")]
+        [EndpointSummary("Get sample weather forecast")]
+        [EndpointDescription("Returns five randomly generated weather forecast entries for demonstration purposes.")]
         public IEnumerable<WeatherForecast> Get()
         {
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast

@@ -71,7 +71,7 @@ namespace Tests.Other
             await Assert.That(result).IsNotNull();
             await Assert.That(result!.IsSuccess).IsFalse();
             await Assert.That(result.Message).IsEqualTo("Result cannot be null.");
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Common.InternalError);
         }
 
         [Test]
@@ -148,7 +148,7 @@ namespace Tests.Other
         public async Task HandleResultGeneric_WhenFailure_ReturnsErrorsAndNullData()
         {
             // Arrange
-            var result = Result<string>.Failure("Resource not found", "NOT_FOUND", StatusCodes.Status404NotFound);
+            var result = Result<string>.Failure("Resource not found", ErrorCodes.Common.NotFound, StatusCodes.Status404NotFound);
 
             // Act
             var actionResult = _sut.ExecuteHandleResult(result);
@@ -161,7 +161,7 @@ namespace Tests.Other
             var actualResult = objectResult.Value as Result<string>;
             await Assert.That(actualResult).IsNotNull();
             await Assert.That(actualResult!.IsSuccess).IsFalse();
-            await Assert.That(actualResult.ErrorCode).IsEqualTo("NOT_FOUND");
+            await Assert.That(actualResult.ErrorCode).IsEqualTo(ErrorCodes.Common.NotFound);
             await Assert.That(actualResult.Data).IsNull();
         }
 
