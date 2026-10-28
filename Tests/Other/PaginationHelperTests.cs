@@ -177,7 +177,7 @@ namespace Tests.Other
         {
             // Arrange
             using var cts = new CancellationTokenSource();
-            cts.Cancel(); 
+            cts.Cancel();
 
             // Act & Assert
             await Assert.That(async () =>

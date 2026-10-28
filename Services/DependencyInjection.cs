@@ -2,6 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
+using Services.Interfaces;
+using Services.Services;
 
 namespace Services
 {
@@ -9,10 +11,8 @@ namespace Services
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
         {
-            // Add application services here
-            // Example: services.AddScoped<IMyService, MyService>();
             services.AddScoped<ICancellationTokenAccessor, HttpCancellationTokenAccessor>();
-
+            services.AddScoped<IUserServices, UserServices>();
             return services;
         }
     }

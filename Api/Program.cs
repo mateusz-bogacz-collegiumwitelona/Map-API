@@ -1,4 +1,5 @@
 using Api.Configuration;
+using Api.Mappers;
 using Api.Middlewares;
 using Infrastructure;
 using Serilog;
@@ -25,6 +26,7 @@ try
     builder.Services.AddSwaggerConfiguration();
     builder.Services.AddHealthCheckConfiguration();
     builder.Services.AddRoutingConfiguration();
+    builder.Services.AddMappers();
     builder.Services.AddFluentValidationConfiguration();
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
