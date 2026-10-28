@@ -35,12 +35,22 @@ namespace Services.Services
             var resolvedUserId = targetUserId ?? currentUserId;
             var isOwner = resolvedUserId == currentUserId;
 
-            var user = await GetUserAsync(resolvedUserId);
+            var user = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == resolvedUserId)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Bio,
+                    u.IsPublic
+                })
+                .FirstOrDefaultAsync(_ct);
 
-            if (!isOwner && !user.IsPublic)
+            if (user == null || (!isOwner && !user.IsPublic))
             {
-                _logger.LogWarning("User {CurrentUserId} attempted to view private profile {TargetUserId}.", currentUserId, resolvedUserId);
-                throw new ForbiddenException("This profile is private.");
+                throw new NotFoundException($"User with ID '{resolvedUserId}' was not found.");
             }
 
             var response = new UserResponse
@@ -52,11 +62,12 @@ namespace Services.Services
                 IsPublic = user.IsPublic
             };
 
+            _logger.LogInformation("User profile retrieved for user ID: {UserId}, IsOwner: {IsOwner}", resolvedUserId, isOwner);
             return Result<UserResponse>.Success(
                 message: "User data retrieved successfully.",
                 data: response,
                 statusCode: StatusCodes.Status200OK
-                );
+            );
         }
 
         public async Task<Result> EditUserAsync(Guid userId, EditUserCommand command)
@@ -73,9 +84,14 @@ namespace Services.Services
                 user.LastName = command.LastName;
             }
 
-            user.Bio = string.IsNullOrWhiteSpace(command.Bio) ? null : command.Bio;
+            if (command.Bio is not null)
+            {
+                user.Bio = string.IsNullOrWhiteSpace(command.Bio) ? null : command.Bio.Trim();
+            }
 
             await _context.SaveChangesAsync(_ct);
+
+            _logger.LogInformation("User data updated for user ID: {UserId}", userId);
 
             return Result.Success(
                 message: "User data updated successfully.",
@@ -98,6 +114,8 @@ namespace Services.Services
             user.IsPublic = isPublic;
             await _context.SaveChangesAsync(_ct);
 
+            _logger.LogInformation("Profile visibility updated for user ID: {UserId} to {Visibility}", userId, isPublic ? "public" : "private");
+
             return Result.Success(
                 message: $"Profile visibility updated to {(isPublic ? "public" : "private")}.",
                 statusCode: StatusCodes.Status200OK
@@ -107,9 +125,9 @@ namespace Services.Services
         private async Task<User> GetUserAsync(Guid userId)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
+
             if (user == null)
             {
-                _logger.LogWarning("User with ID {UserId} not found.", userId);
                 throw new NotFoundException($"User with ID '{userId}' was not found.");
             }
 

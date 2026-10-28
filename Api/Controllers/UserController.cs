@@ -17,9 +17,9 @@ namespace Api.Controllers
         [EndpointDescription("Return the basic profile information such as user id, first name, last name and bio if exist.")]
         [ProducesResponseType(typeof(Result<UserResponse>), StatusCodes.Status200OK)]
         [HttpGet]
-        [Authorize(Roles = "User")]
+        [Authorize]
         public async Task<IActionResult> GetUserProfileAsync(
-            [FromRoute] Guid? userId,
+            [FromQuery] Guid? userId,
             [FromServices] IUserServices user)
         {
             var result = await user.GetUserProfileAsync(CurrentUserId, userId);
@@ -30,7 +30,7 @@ namespace Api.Controllers
         [EndpointDescription("Edit the user profile information such as first name, last name and bio.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         [HttpPatch]
-        [Authorize(Roles = "User")]
+        [Authorize]
         public async Task<IActionResult> EditUserDataAsync(
             [FromServices] IUserServices user,
             [FromServices] UserMapper mapper,
@@ -44,7 +44,7 @@ namespace Api.Controllers
         [EndpointDescription("Set the profile visibility to public or private.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         [HttpPatch("visibility/{isPublic:bool}")]
-        [Authorize(Roles = "User")]
+        [Authorize]
         public async Task<IActionResult> SetProfileVisibilityAsync(
             [FromServices] IUserServices user,
             [FromRoute] bool isPublic)

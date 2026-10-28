@@ -139,7 +139,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task GetUserProfileAsync_WhenTargetUserIsPrivateAndNotOwner_ShouldThrowForbiddenException()
+        public async Task GetUserProfileAsync_WhenTargetUserIsPrivateAndNotOwner_ShouldThrowNotFoundException()
         {
             // Arrange
             var ownerId = Guid.NewGuid();
@@ -158,8 +158,8 @@ namespace Tests.Services
 
             // Act & Assert
             await Assert.That(async () => await _userServicesMock.GetUserProfileAsync(requesterId, ownerId))
-                .Throws<ForbiddenException>()
-                .WithMessage("This profile is private.");
+                .Throws<NotFoundException>()
+                .WithMessage($"User with ID '{ownerId}' was not found.");
         }
 
         [Test]

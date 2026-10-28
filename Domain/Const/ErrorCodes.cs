@@ -8,6 +8,7 @@
         public const string BadRequest = "BAD_REQUEST";
         public const string InternalError = "INTERNAL_ERROR";
         public const string ValidationError = "VALIDATION_ERROR";
+        public const string AccessDenied = "ACCESS_DENIED";
 
         // User
         public const string UserFirstNameInvalid = "USR_001";
