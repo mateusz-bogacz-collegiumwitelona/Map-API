@@ -4,6 +4,7 @@
     {
         public static IServiceCollection AddMappers(this IServiceCollection services)
         {
+            services.AddSingleton<AuthMapper>();
             services.AddSingleton<UserMapper>();
             return services;
         }

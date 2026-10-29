@@ -29,7 +29,7 @@ Aby uruchomić projekt lokalnie, będziesz potrzebować:
    cp .env.example .env
    ```
 
-   Pamiętaj, aby w pliku .env uzupełnić brakujące wartości, zwłaszcza ASPNETCORE_JWT_KEY (musi to być bezpieczny, odpowiednio długi ciąg znaków).
+   Pamiętaj, aby w pliku .env uzupełnić brakujące wartości, zwłaszcza JWT__SECRETKEY (musi to być bezpieczny ciąg znaków o długości co najmniej 32 bajtów).
 
 2. **Zbudowanie i uruchomienie kontenerów**
    Uruchom całe środowisko (Baza danych, Redis, MailPit oraz samo API) za pomocą komendy:

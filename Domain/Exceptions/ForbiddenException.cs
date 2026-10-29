@@ -4,7 +4,7 @@ namespace Domain.Exceptions
 {
     public class ForbiddenException : AppException
     {
-        public ForbiddenException(string message, string errorCode = ErrorCodes.AccessDenied)
+        public ForbiddenException(string message, string errorCode = ErrorCodes.Common.AccessDenied)
             : base(message, errorCode, 403)
         {
         }

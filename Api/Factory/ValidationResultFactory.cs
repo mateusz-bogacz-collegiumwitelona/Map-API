@@ -19,7 +19,7 @@ namespace Api.Factory
             var firstErrorCode = validationResults
                 .SelectMany(x => x.Value.Errors)
                 .Select(x => x.ErrorCode)
-                .FirstOrDefault(code => !string.IsNullOrEmpty(code)) ?? ErrorCodes.ValidationError;
+                .FirstOrDefault(code => !string.IsNullOrEmpty(code)) ?? ErrorCodes.Validation.ValidationError;
 
             var errors = validationProblemDetails.Errors
                .SelectMany(x => x.Value)

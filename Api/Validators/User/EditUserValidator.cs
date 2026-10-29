@@ -13,11 +13,11 @@ namespace Api.Validators.User
                 RuleFor(x => x.FirstName)
                     .Cascade(CascadeMode.Stop)
                     .Must(x => !string.IsNullOrWhiteSpace(x))
-                    .WithErrorCode(ErrorCodes.UserFirstNameInvalid)
+                    .WithErrorCode(ErrorCodes.User.FirstNameInvalid)
                     .Must(x => x!.Trim().Length >= 2)
-                    .WithErrorCode(ErrorCodes.UserFirstNameInvalid)
+                    .WithErrorCode(ErrorCodes.User.FirstNameInvalid)
                     .Must(x => x!.Trim().Length <= 50)
-                    .WithErrorCode(ErrorCodes.UserFirstNameInvalid);
+                    .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
             });
 
             When(x => x.LastName != null, () =>
@@ -25,18 +25,18 @@ namespace Api.Validators.User
                 RuleFor(x => x.LastName)
                     .Cascade(CascadeMode.Stop)
                     .Must(x => !string.IsNullOrWhiteSpace(x))
-                    .WithErrorCode(ErrorCodes.UserLastNameInvalid)
+                    .WithErrorCode(ErrorCodes.User.LastNameInvalid)
                     .Must(x => x!.Trim().Length >= 2)
-                    .WithErrorCode(ErrorCodes.UserLastNameInvalid)
+                    .WithErrorCode(ErrorCodes.User.LastNameInvalid)
                     .Must(x => x!.Trim().Length <= 50)
-                    .WithErrorCode(ErrorCodes.UserLastNameInvalid);
+                    .WithErrorCode(ErrorCodes.User.LastNameInvalid);
             });
 
             When(x => x.Bio != null, () =>
             {
                 RuleFor(x => x.Bio)
                     .Must(x => x!.Trim().Length <= 500)
-                    .WithErrorCode(ErrorCodes.UserBioInvalid);
+                    .WithErrorCode(ErrorCodes.User.BioInvalid);
             });
         }
     }

@@ -58,7 +58,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.FirstName)
-                  .WithErrorCode(ErrorCodes.UserFirstNameInvalid);
+                  .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
         }
 
         [Test]
@@ -72,7 +72,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.FirstName)
-                  .WithErrorCode(ErrorCodes.UserFirstNameInvalid);
+                  .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
         }
 
         [Test]
@@ -86,7 +86,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.FirstName)
-                  .WithErrorCode(ErrorCodes.UserFirstNameInvalid);
+                  .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
         }
 
         [Test]
@@ -102,7 +102,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.LastName)
-                  .WithErrorCode(ErrorCodes.UserLastNameInvalid);
+                  .WithErrorCode(ErrorCodes.User.LastNameInvalid);
         }
 
         [Test]
@@ -116,7 +116,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.LastName)
-                  .WithErrorCode(ErrorCodes.UserLastNameInvalid);
+                  .WithErrorCode(ErrorCodes.User.LastNameInvalid);
         }
 
         [Test]
@@ -130,7 +130,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.LastName)
-                  .WithErrorCode(ErrorCodes.UserLastNameInvalid);
+                  .WithErrorCode(ErrorCodes.User.LastNameInvalid);
         }
 
         [Test]
@@ -144,7 +144,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Bio)
-                  .WithErrorCode(ErrorCodes.UserBioInvalid);
+                  .WithErrorCode(ErrorCodes.User.BioInvalid);
         }
 
         [Test]

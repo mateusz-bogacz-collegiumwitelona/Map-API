@@ -5,7 +5,7 @@ namespace Domain.Exceptions
     public class NotFoundException : AppException
     {
         public NotFoundException(string message)
-            : base(message, ErrorCodes.NotFound, 404)
+            : base(message, ErrorCodes.Common.NotFound, 404)
         {
         }
     }

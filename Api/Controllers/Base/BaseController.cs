@@ -30,7 +30,7 @@ namespace Api.Controllers.Base
                     StatusCodes.Status500InternalServerError,
                     Result<T>.Failure(
                         message: "Result cannot be null.",
-                        errorCode: ErrorCodes.InternalError,
+                        errorCode: ErrorCodes.Common.InternalError,
                         statusCode: StatusCodes.Status500InternalServerError
                     )
                 );
@@ -47,7 +47,7 @@ namespace Api.Controllers.Base
                     StatusCodes.Status500InternalServerError,
                     Result.Failure(
                         message: "Result cannot be null.",
-                        errorCode: ErrorCodes.InternalError,
+                        errorCode: ErrorCodes.Common.InternalError,
                         statusCode: StatusCodes.Status500InternalServerError
                     )
                 );
