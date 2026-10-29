@@ -26,7 +26,6 @@ try
     builder.Services.AddSwaggerConfiguration();
     builder.Services.AddHealthCheckConfiguration();
     builder.Services.AddRoutingConfiguration();
-    builder.Services.AddMapperConfiguration();
     builder.Services.AddMappers();
     builder.Services.AddFluentValidationConfiguration();
     builder.Services.AddAuthenticationConfiguration(builder.Configuration);

@@ -3,10 +3,11 @@ using Domain.Models;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
+using Testcontainers.PostgreSql;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
 using Services.Commands.Auth;
@@ -29,9 +30,12 @@ namespace Tests.Auth
         private const string JwtIssuer = "MAP-API-Tests";
         private const string JwtAudience = "MAP-API-Tests";
 
+        private static PostgreSqlContainer _dbContainer = null!;
+        private static string _connectionString = null!;
+
         private ServiceProvider _serviceProvider = null!;
         private IServiceScope _scope = null!;
-        private SqliteConnection _connection = null!;
+        private string _currentSchema = null!;
         private JwtOptions _jwtOptions = null!;
 
         private AppDbContext Context => _scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -39,6 +43,33 @@ namespace Tests.Auth
         private RoleManager<IdentityRole<Guid>> RoleManager => _scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         private CountingPasswordHasher CountingHasher => _scope.ServiceProvider.GetRequiredService<CountingPasswordHasher>();
         private IAuthService Sut => _scope.ServiceProvider.GetRequiredService<IAuthService>();
+
+        [Before(Class)]
+        public static async Task SetupClassAsync()
+        {
+            _dbContainer = new PostgreSqlBuilder("postgis/postgis:18-3.6")
+                .WithDatabase("testdb")
+                .WithUsername("testuser")
+                .WithPassword("testpassword")
+                .WithCommand(
+                    "-c", "max_connections=300",
+                    "-c", "max_locks_per_transaction=1024",
+                    "-c", "shared_buffers=256MB")
+                .Build();
+
+            await _dbContainer.StartAsync();
+            _connectionString = _dbContainer.GetConnectionString();
+
+            using var conn = new NpgsqlConnection(_connectionString);
+            await conn.OpenAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS unaccent;";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        [After(Class)]
+        public static async Task CleanupClassAsync()
+            => await _dbContainer.DisposeAsync();
 
         [Before(Test)]
         public async Task SetupAsync()
@@ -52,21 +83,32 @@ namespace Tests.Auth
                 RefreshTokenExpirationDays = 7
             };
 
-            var services = new ServiceCollection();
+            _currentSchema = "test_schema_" + Guid.NewGuid().ToString("N");
 
-            _connection = new SqliteConnection("DataSource=:memory:");
-            await _connection.OpenAsync();
+            using (var conn = new NpgsqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = $"CREATE SCHEMA IF NOT EXISTS {_currentSchema};";
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            var schemaConnectionString = $"{_connectionString};SearchPath={_currentSchema},public";
+
+            var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(schemaConnectionString, options =>
+                {
+                    options.UseNetTopologySuite();
+                })
+                .Options;
+
+            var services = new ServiceCollection();
 
             services.AddLogging();
             services.AddHttpContextAccessor();
             services.AddScoped<ICancellationTokenAccessor, HttpCancellationTokenAccessor>();
 
-            services.AddScoped<AuthTestDbContext>(_ =>
-                new AuthTestDbContext(
-                    new DbContextOptionsBuilder<AppDbContext>()
-                        .UseSqlite(_connection)
-                        .Options));
-            services.AddScoped<AppDbContext>(provider => provider.GetRequiredService<AuthTestDbContext>());
+            services.AddScoped<AppDbContext>(_ => new AppDbContext(dbOptions));
 
             services.AddIdentity<User, IdentityRole<Guid>>(options =>
             {
@@ -80,7 +122,7 @@ namespace Tests.Auth
                 options.Lockout.MaxFailedAccessAttempts = MaxFailedAccessAttempts;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
-            .AddEntityFrameworkStores<AuthTestDbContext>()
+            .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
 
             services.AddScoped<CountingPasswordHasher>();
@@ -101,7 +143,8 @@ namespace Tests.Auth
             _serviceProvider = services.BuildServiceProvider();
             _scope = _serviceProvider.CreateScope();
 
-            await Context.Database.EnsureCreatedAsync();
+            var createScript = Context.Database.GenerateCreateScript();
+            await Context.Database.ExecuteSqlRawAsync(createScript);
 
             await CreateRoleAsync("User");
             await CreateRoleAsync("Admin");
@@ -112,7 +155,12 @@ namespace Tests.Auth
         {
             _scope.Dispose();
             await _serviceProvider.DisposeAsync();
-            await _connection.DisposeAsync();
+
+            using var conn = new NpgsqlConnection(_connectionString);
+            await conn.OpenAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"DROP SCHEMA IF EXISTS {_currentSchema} CASCADE;";
+            await cmd.ExecuteNonQueryAsync();
         }
 
         #endregion
@@ -771,24 +819,6 @@ namespace Tests.Auth
             }
 
             return user;
-        }
-
-        private sealed class AuthTestDbContext : AppDbContext
-        {
-            public AuthTestDbContext(DbContextOptions<AppDbContext> options) : base(options)
-            {
-            }
-
-            protected override void OnModelCreating(ModelBuilder builder)
-            {
-                base.OnModelCreating(builder);
-
-                builder.Ignore<Country>();
-                builder.Ignore<Place>();
-                builder.Ignore<Trip>();
-                builder.Ignore<TripSegment>();
-                builder.Ignore<VisitedCountry>();
-            }
         }
 
         private sealed class CountingPasswordHasher : IPasswordHasher<User>
