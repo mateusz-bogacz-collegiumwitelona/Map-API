@@ -2,8 +2,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
+using Services.Interfaces;
 using Services.Interfaces.Auth;
 using Services.Options;
+using Services.Services;
 using Services.Services.Auth;
 
 namespace Services
@@ -12,8 +14,6 @@ namespace Services
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
         {
-            // Add application services here
-            // Example: services.AddScoped<IMyService, MyService>();
             services.AddScoped<ICancellationTokenAccessor, HttpCancellationTokenAccessor>();
 
             services.AddOptions<JwtOptions>()
@@ -23,6 +23,7 @@ namespace Services
 
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IUserServices, UserServices>();
 
             return services;
         }

@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Domain.Models.Base.Interfaces;
+using Microsoft.AspNetCore.Identity;
 
 namespace Domain.Models
 {
-    public class User : IdentityUser<Guid>
+    public class User : IdentityUser<Guid>, IAuditableEntity, ISoftDeletableEntity
     {
         public string FirstName { get; set; } = null!;
         public string LastName { get; set; } = null!;

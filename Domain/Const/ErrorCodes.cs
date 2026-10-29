@@ -78,6 +78,21 @@
             /// Returned when the caller has exceeded the allowed request rate.
             /// </summary>
             public const string TooManyRequests = "COMMON_005";
+
+            /// <summary>
+            /// Returned when the caller is authenticated but not allowed to perform the operation.
+            /// </summary>
+            public const string AccessDenied = "ACCESS_DENIED";
+        }
+
+        /// <summary>
+        /// Error codes related to user profile validation.
+        /// </summary>
+        public static class User
+        {
+            public const string FirstNameInvalid = "USR_001";
+            public const string LastNameInvalid = "USR_002";
+            public const string BioInvalid = "USR_003";
         }
     }
 }

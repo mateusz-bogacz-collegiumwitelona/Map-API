@@ -1,4 +1,5 @@
 using Api.Configuration;
+using Api.Mappers;
 using Api.Middlewares;
 using Infrastructure;
 using Serilog;
@@ -26,6 +27,7 @@ try
     builder.Services.AddHealthCheckConfiguration();
     builder.Services.AddRoutingConfiguration();
     builder.Services.AddMapperConfiguration();
+    builder.Services.AddMappers();
     builder.Services.AddFluentValidationConfiguration();
     builder.Services.AddAuthenticationConfiguration(builder.Configuration);
     builder.Services.AddAuthorizationConfiguration();
