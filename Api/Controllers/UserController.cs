@@ -61,7 +61,7 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(Result), StatusCodes.Status409Conflict)]
         [HttpPost("email")]
         [Authorize(Policy = AuthorizationConfiguration.UserPolicy)]
-        [EnableRateLimiting(RateLimitingConfiguration.AuthPolicy)]
+        [EnableRateLimiting(RateLimitingConfiguration.EmailResendPolicy)]
         public async Task<IActionResult> RequestEmailChangeAsync(
             [FromServices] IAccountServices account,
             [FromServices] UserMapper mapper,

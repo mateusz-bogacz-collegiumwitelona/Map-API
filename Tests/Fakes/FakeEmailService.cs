@@ -28,7 +28,6 @@ namespace Tests.Fakes
             return Task.CompletedTask;
         }
 
-        // Concurrency tests send from several scopes at once.
         private void Record(SentEmail email)
         {
             lock (_lock)

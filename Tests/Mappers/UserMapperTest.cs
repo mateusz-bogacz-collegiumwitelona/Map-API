@@ -64,6 +64,19 @@ namespace Tests.Mappers
         }
 
         [Test]
+        public async Task MapChangeEmail_WhenEmailHasSurroundingSpaces_ShouldTrimEmail()
+        {
+            // Arrange
+            var request = new ChangeEmailRequest { NewEmail = "  new@example.com  " };
+
+            // Act
+            var result = _mapper.MapChangeEmail(request);
+
+            // Assert
+            await Assert.That(result.NewEmail).IsEqualTo("new@example.com");
+        }
+
+        [Test]
         public async Task MapConfirmEmailChange_ShouldMapCode()
         {
             // Arrange

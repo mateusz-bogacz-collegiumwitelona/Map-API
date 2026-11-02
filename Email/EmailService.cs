@@ -55,8 +55,6 @@ namespace Email
             _logger.LogInformation("Email '{Subject}' sent successfully.", content.Subject);
         }
 
-        // With credentials configured TLS is required, so a server without STARTTLS fails instead of receiving the password in plain text.
-        // Without credentials (local MailPit) encryption is used only when the server offers it.
         public static SecureSocketOptions GetSecureSocketOptions(SmtpOptions options)
         {
             if (string.IsNullOrWhiteSpace(options.Username))

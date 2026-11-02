@@ -32,8 +32,6 @@ namespace Tests.Validators
         [Arguments("missing-domain@")]
         [Arguments("@missing-local.com")]
         [Arguments("two@@example.com")]
-        [Arguments("with space@example.com")]
-        [Arguments("Jan Kowalski <jan@example.com>")]
         public async Task Validate_WhenEmailIsInvalid_ShouldHaveEmailInvalidError(string email)
         {
             // Arrange

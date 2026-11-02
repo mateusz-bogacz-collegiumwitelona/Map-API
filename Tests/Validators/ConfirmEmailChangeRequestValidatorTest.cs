@@ -12,7 +12,6 @@ namespace Tests.Validators
         [Test]
         [Arguments("123456")]
         [Arguments("000000")]
-        [Arguments(" 123456 ")]
         public async Task Validate_WhenCodeIsValid_ShouldNotHaveAnyValidationErrors(string code)
         {
             // Arrange
@@ -32,6 +31,7 @@ namespace Tests.Validators
         [Arguments("1234567")]
         [Arguments("12a456")]
         [Arguments("12 456")]
+        [Arguments(" 123456 ")]
         [Arguments("١٢٣٤٥٦")]
         public async Task Validate_WhenCodeIsInvalid_ShouldHaveCodeInvalidError(string code)
         {

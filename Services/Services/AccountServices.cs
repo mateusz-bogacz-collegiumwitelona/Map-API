@@ -55,7 +55,7 @@ namespace Services.Services
                 return UserNotFound(userId);
             }
 
-            var newEmail = command.NewEmail.Trim();
+            var newEmail = command.NewEmail;
             var normalizedEmail = _normalizer.NormalizeEmail(newEmail);
 
             if (normalizedEmail == user.NormalizedEmail)
@@ -80,46 +80,12 @@ namespace Services.Services
                 ExpiredAt = DateTime.UtcNow.AddMinutes(VerificationConst.CodeExpirationMinutes)
             };
 
-            await using (var transaction = await _context.Database.BeginTransactionAsync(_ct))
-            {
-                // Locking the user row makes parallel requests run the cooldown check one at a time.
-                await _context.Database.ExecuteSqlAsync($"SELECT 1 FROM \"Users\" WHERE \"Id\" = {userId} FOR UPDATE", _ct);
+            await PendingEmailChangeCodes(userId).ExecuteDeleteAsync(_ct);
 
-                var lastCodeCreatedAt = await PendingEmailChangeCodes(userId)
-                    .OrderByDescending(c => c.CreatedAt)
-                    .Select(c => (DateTime?)c.CreatedAt)
-                    .FirstOrDefaultAsync(_ct);
+            _context.EmailVerificationCodes.Add(verificationCode);
+            await _context.SaveChangesAsync(_ct);
 
-                if (lastCodeCreatedAt > DateTime.UtcNow.AddSeconds(-VerificationConst.ResendCooldownSeconds))
-                {
-                    return Result.Failure(
-                        message: "A verification code was sent recently. Please wait before requesting a new one.",
-                        errorCode: ErrorCodes.Common.TooManyRequests,
-                        statusCode: StatusCodes.Status429TooManyRequests);
-                }
-
-                await PendingEmailChangeCodes(userId).ExecuteDeleteAsync(_ct);
-
-                _context.EmailVerificationCodes.Add(verificationCode);
-                await _context.SaveChangesAsync(_ct);
-
-                await transaction.CommitAsync(_ct);
-            }
-
-            // The email is sent after the commit, so no transaction stays open during SMTP and a delivered code is always saved.
-            try
-            {
-                await _emailService.SendEmailChangeCodeAsync(newEmail, user.FirstName, verificationCode.Code, VerificationConst.CodeExpirationMinutes, _ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // The code never reached the user, so it is removed to let them request a new one without waiting for the cooldown.
-                await _context.EmailVerificationCodes
-                    .Where(c => c.Id == verificationCode.Id)
-                    .ExecuteDeleteAsync(CancellationToken.None);
-
-                throw;
-            }
+            await _emailService.SendEmailChangeCodeAsync(newEmail, user.FirstName, verificationCode.Code, VerificationConst.CodeExpirationMinutes, _ct);
 
             _logger.LogInformation("Email change code sent for user ID: {UserId}", userId);
 
@@ -155,7 +121,6 @@ namespace Services.Services
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            // Conditional update counts the attempt atomically, so parallel requests cannot exceed the limit.
             var attemptCounted = await _context.EmailVerificationCodes
                 .Where(c => c.Id == verificationCode.Id && !c.IsUsed && c.AttemptsCount < VerificationConst.MaxAttempts)
                 .ExecuteUpdateAsync(
@@ -172,7 +137,7 @@ namespace Services.Services
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if (!CodesMatch(verificationCode.Code, command.Code.Trim()))
+            if (!CodesMatch(verificationCode.Code, command.Code))
             {
                 return CodeInvalid();
             }
@@ -219,7 +184,6 @@ namespace Services.Services
             }
             catch (DbUpdateException ex) when (IsUniqueViolation(ex))
             {
-                // Another account took the address after the check above; disposing the transaction rolls back the used code.
                 return EmailTaken();
             }
 
@@ -252,10 +216,7 @@ namespace Services.Services
                 .ExecuteDeleteAsync(_ct);
 
             Anonymize(user);
-
-            // Flags are set directly instead of Remove(), so EF does not cascade-delete tracked dependents such as refresh tokens.
-            user.IsDeleted = true;
-            user.DeletedAt = DateTime.UtcNow;
+            _context.Users.Remove(user);
 
             await _context.SaveChangesAsync(_ct);
             await transaction.CommitAsync(_ct);
@@ -298,7 +259,6 @@ namespace Services.Services
 
         private static void RefreshStamps(User user)
         {
-            // A new security stamp invalidates Identity tokens (e.g. password reset) issued before the change.
             user.SecurityStamp = Guid.NewGuid().ToString("N").ToUpperInvariant();
             user.ConcurrencyStamp = Guid.NewGuid().ToString();
         }
@@ -316,7 +276,6 @@ namespace Services.Services
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The email has already been changed, so a failed notification must not fail the request.
                 _logger.LogWarning(ex, "Failed to send email change notification for user ID: {UserId}", userId);
             }
         }

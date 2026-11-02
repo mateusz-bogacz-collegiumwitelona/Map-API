@@ -21,8 +21,6 @@ namespace Api.Configuration
                 throw new InvalidOperationException(JwtOptionsValidation.ErrorMessage);
             }
 
-            // AddIdentity registers its cookie scheme as the default authenticate/challenge scheme,
-            // so JWT bearer has to be set explicitly or bearer tokens are never read.
             services.AddAuthentication(options =>
                 {
                     options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -65,7 +63,6 @@ namespace Api.Configuration
 
             var dbContext = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
 
-            // The soft-delete query filter hides deleted accounts, so their unexpired access tokens stop working immediately.
             var isActive = await dbContext.Users
                 .AsNoTracking()
                 .AnyAsync(u => u.Id == parsedUserId, context.HttpContext.RequestAborted);

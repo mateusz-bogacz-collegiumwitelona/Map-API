@@ -10,12 +10,12 @@ namespace Api.Validators.User
         {
             RuleFor(x => x.Code)
                 .Cascade(CascadeMode.Stop)
-                .Must(x => !string.IsNullOrWhiteSpace(x))
-                .WithErrorCode(ErrorCodes.Verification.CodeInvalid)
-                .Must(x => x.Trim().Length == VerificationConst.CodeLength)
-                .WithErrorCode(ErrorCodes.Verification.CodeInvalid)
-                .Must(x => x.Trim().All(char.IsAsciiDigit))
-                .WithErrorCode(ErrorCodes.Verification.CodeInvalid);
+                .NotEmpty()
+                    .WithErrorCode(ErrorCodes.Verification.CodeInvalid)
+                .Length(VerificationConst.CodeLength)
+                    .WithErrorCode(ErrorCodes.Verification.CodeInvalid)
+                .Must(x => x.All(char.IsAsciiDigit))
+                    .WithErrorCode(ErrorCodes.Verification.CodeInvalid);
         }
     }
 }

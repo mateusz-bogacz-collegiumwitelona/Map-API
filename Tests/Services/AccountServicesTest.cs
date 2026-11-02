@@ -164,7 +164,7 @@ namespace Tests.Services
             var user = await CreateUserAsync("old@example.com");
 
             // Act
-            var result = await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "  new@example.com " });
+            var result = await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "new@example.com" });
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -256,28 +256,11 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task RequestEmailChangeAsync_WhenCodeWasRequestedRecently_ShouldReturnTooManyRequests()
-        {
-            // Arrange
-            var user = await CreateUserAsync("old@example.com");
-            await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "new@example.com" });
-
-            // Act
-            var result = await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "other@example.com" });
-
-            // Assert
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status429TooManyRequests);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Common.TooManyRequests);
-            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(1);
-        }
-
-        [Test]
-        public async Task RequestEmailChangeAsync_WhenCooldownHasPassed_ShouldReplacePreviousPendingCode()
+        public async Task RequestEmailChangeAsync_WhenCodeIsAlreadyPending_ShouldReplacePreviousPendingCode()
         {
             // Arrange
             var user = await CreateUserAsync("old@example.com");
             await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "first@example.com" });
-            await MoveCodesCreatedAtAsync(user.Id, TimeSpan.FromSeconds(-VerificationConst.ResendCooldownSeconds - 1));
 
             // Act
             var result = await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "second@example.com" });
@@ -295,7 +278,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task RequestEmailChangeAsync_WhenEmailCannotBeSent_ShouldNotPersistCode()
+        public async Task RequestEmailChangeAsync_WhenEmailCannotBeSent_ShouldThrow()
         {
             // Arrange
             var user = await CreateUserAsync("old@example.com");
@@ -304,54 +287,6 @@ namespace Tests.Services
             // Act & Assert
             await Assert.That(async () => await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "new@example.com" }))
                 .Throws<InvalidOperationException>();
-
-            var codesCount = await Context.EmailVerificationCodes.AsNoTracking().CountAsync(c => c.UserId == user.Id);
-            await Assert.That(codesCount).IsEqualTo(0);
-        }
-
-        [Test]
-        public async Task RequestEmailChangeAsync_WhenPreviousSendFailed_ShouldAllowRetryWithoutCooldown()
-        {
-            // Arrange
-            var user = await CreateUserAsync("old@example.com");
-            _emailService.ThrowOnSend = true;
-
-            try
-            {
-                await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "new@example.com" });
-            }
-            catch (InvalidOperationException)
-            {
-                // Expected: the SMTP failure is rethrown to the caller.
-            }
-
-            _emailService.ThrowOnSend = false;
-
-            // Act
-            var result = await Sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = "new@example.com" });
-
-            // Assert
-            await Assert.That(result.IsSuccess).IsTrue();
-            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(1);
-        }
-
-        [Test]
-        public async Task RequestEmailChangeAsync_WhenRequestsRunInParallel_ShouldSendOnlyOneCode()
-        {
-            // Arrange
-            var user = await CreateUserAsync("old@example.com");
-
-            // Act
-            var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(i => Task.Run(() =>
-                RunInNewScopeAsync(sut => sut.RequestEmailChangeAsync(user.Id, new ChangeEmailCommand { NewEmail = $"new{i}@example.com" })))));
-
-            // Assert
-            await Assert.That(results.Count(r => r.IsSuccess)).IsEqualTo(1);
-            await Assert.That(results.Where(r => !r.IsSuccess).All(r => r.StatusCode == StatusCodes.Status429TooManyRequests)).IsTrue();
-            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(1);
-
-            var pendingCodesCount = await Context.EmailVerificationCodes.AsNoTracking().CountAsync(c => c.UserId == user.Id && !c.IsUsed);
-            await Assert.That(pendingCodesCount).IsEqualTo(1);
         }
 
         [Test]
@@ -619,7 +554,7 @@ namespace Tests.Services
             var user = await CreateUserAsync("delete-me@example.com", isPublic: true, bio: "My bio");
 
             // Act
-            var result = await Sut.DeleteAccountAsync(user.Id);
+            var result = await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -650,7 +585,7 @@ namespace Tests.Services
             var secondSession = await AuthService.LoginAsync(new LoginCommand("delete-me@example.com", Password));
 
             // Act
-            await Sut.DeleteAccountAsync(user.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
 
             // Assert
             var activeTokens = await Context.RefreshTokens.AsNoTracking().CountAsync(t => t.UserId == user.Id && !t.IsRevoked);
@@ -671,7 +606,7 @@ namespace Tests.Services
             var user = await CreateUserAsync("delete-me@example.com");
 
             // Act
-            await Sut.DeleteAccountAsync(user.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
             var loginResult = await AuthService.LoginAsync(new LoginCommand("delete-me@example.com", Password));
 
             // Assert
@@ -687,7 +622,7 @@ namespace Tests.Services
             var viewer = await CreateUserAsync("viewer@example.com");
 
             // Act
-            await Sut.DeleteAccountAsync(user.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
 
             // Assert
             await Assert.That(async () => await UserServices.GetUserProfileAsync(viewer.Id, user.Id))
@@ -700,7 +635,7 @@ namespace Tests.Services
             // Arrange
             var deletedUser = await CreateUserAsync("reused@example.com");
             var otherUser = await CreateUserAsync("other@example.com");
-            await Sut.DeleteAccountAsync(deletedUser.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(deletedUser.Id));
 
             // Act
             var result = await Sut.RequestEmailChangeAsync(otherUser.Id, new ChangeEmailCommand { NewEmail = "reused@example.com" });
@@ -725,7 +660,7 @@ namespace Tests.Services
             await Context.SaveChangesAsync();
 
             // Act
-            await Sut.DeleteAccountAsync(user.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
 
             // Assert
             var tripsCount = await Context.Trips.AsNoTracking().CountAsync(t => t.UserId == user.Id);
@@ -739,7 +674,7 @@ namespace Tests.Services
         public async Task DeleteAccountAsync_WhenUserDoesNotExist_ShouldReturnNotFound()
         {
             // Act
-            var result = await Sut.DeleteAccountAsync(Guid.NewGuid());
+            var result = await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(Guid.NewGuid()));
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
@@ -751,10 +686,10 @@ namespace Tests.Services
         {
             // Arrange
             var user = await CreateUserAsync("delete-me@example.com");
-            await Sut.DeleteAccountAsync(user.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
 
             // Act
-            var result = await Sut.DeleteAccountAsync(user.Id);
+            var result = await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
@@ -783,7 +718,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await CreateUserAsync("delete-me@example.com");
-            await Sut.DeleteAccountAsync(user.Id);
+            await RunInNewScopeAsync(sut => sut.DeleteAccountAsync(user.Id));
             var context = CreateTokenValidatedContext(user.Id.ToString());
 
             // Act
@@ -865,12 +800,6 @@ namespace Tests.Services
                 .AsNoTracking()
                 .SingleAsync(u => u.Id == userId);
 
-        private Task MoveCodesCreatedAtAsync(Guid userId, TimeSpan offset)
-            => Context.EmailVerificationCodes
-                .Where(c => c.UserId == userId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.CreatedAt, c => c.CreatedAt + offset));
-
-        // Each call gets its own scope (and DbContext), like separate HTTP requests.
         private async Task<Result> RunInNewScopeAsync(Func<IAccountServices, Task<Result>> action)
         {
             using var scope = _serviceProvider.CreateScope();
