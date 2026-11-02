@@ -93,6 +93,42 @@
             public const string FirstNameInvalid = "USR_001";
             public const string LastNameInvalid = "USR_002";
             public const string BioInvalid = "USR_003";
+
+            /// <summary>
+            /// Returned when the supplied email address is empty, malformed, or too long.
+            /// </summary>
+            public const string EmailInvalid = "USR_004";
+
+            /// <summary>
+            /// Returned when the requested email address is already used by another account.
+            /// </summary>
+            public const string EmailTaken = "USR_005";
+
+            /// <summary>
+            /// Returned when the requested email address is the same as the account's current email address.
+            /// </summary>
+            public const string EmailUnchanged = "USR_006";
+        }
+
+        /// <summary>
+        /// Error codes related to email verification codes.
+        /// </summary>
+        public static class Verification
+        {
+            /// <summary>
+            /// Returned when the verification code is malformed, incorrect, already used, or no code is pending.
+            /// </summary>
+            public const string CodeInvalid = "VER_001";
+
+            /// <summary>
+            /// Returned when the verification code has expired and a new one must be requested.
+            /// </summary>
+            public const string CodeExpired = "VER_002";
+
+            /// <summary>
+            /// Returned when the maximum number of attempts for the verification code has been reached.
+            /// </summary>
+            public const string AttemptsExceeded = "VER_003";
         }
     }
 }

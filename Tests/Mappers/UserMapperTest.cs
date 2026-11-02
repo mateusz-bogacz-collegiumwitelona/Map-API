@@ -48,5 +48,33 @@ namespace Tests.Mappers
             await Assert.That(result.LastName).IsNull();
             await Assert.That(result.Bio).IsNull();
         }
+
+        [Test]
+        public async Task MapChangeEmail_ShouldMapNewEmail()
+        {
+            // Arrange
+            var request = new ChangeEmailRequest { NewEmail = "new@example.com" };
+
+            // Act
+            var result = _mapper.MapChangeEmail(request);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.NewEmail).IsEqualTo("new@example.com");
+        }
+
+        [Test]
+        public async Task MapConfirmEmailChange_ShouldMapCode()
+        {
+            // Arrange
+            var request = new ConfirmEmailChangeRequest { Code = "123456" };
+
+            // Act
+            var result = _mapper.MapConfirmEmailChange(request);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.Code).IsEqualTo("123456");
+        }
     }
 }

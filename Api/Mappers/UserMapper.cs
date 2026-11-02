@@ -11,5 +11,9 @@ namespace Api.Mappers
         [MapProperty(nameof(EditUserRequest.FirstName), nameof(EditUserCommand.FirstName), Use = nameof(NormalizeNullableName))]
         [MapProperty(nameof(EditUserRequest.LastName), nameof(EditUserCommand.LastName), Use = nameof(NormalizeNullableName))]
         public partial EditUserCommand MapEdit(EditUserRequest request);
+
+        public partial ChangeEmailCommand MapChangeEmail(ChangeEmailRequest request);
+
+        public partial ConfirmEmailChangeCommand MapConfirmEmailChange(ConfirmEmailChangeRequest request);
     }
 }

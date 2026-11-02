@@ -25,6 +25,13 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.User.FirstNameInvalid).IsEqualTo("USR_001");
             await Assert.That(ErrorCodes.User.LastNameInvalid).IsEqualTo("USR_002");
             await Assert.That(ErrorCodes.User.BioInvalid).IsEqualTo("USR_003");
+            await Assert.That(ErrorCodes.User.EmailInvalid).IsEqualTo("USR_004");
+            await Assert.That(ErrorCodes.User.EmailTaken).IsEqualTo("USR_005");
+            await Assert.That(ErrorCodes.User.EmailUnchanged).IsEqualTo("USR_006");
+
+            await Assert.That(ErrorCodes.Verification.CodeInvalid).IsEqualTo("VER_001");
+            await Assert.That(ErrorCodes.Verification.CodeExpired).IsEqualTo("VER_002");
+            await Assert.That(ErrorCodes.Verification.AttemptsExceeded).IsEqualTo("VER_003");
         }
 
         [Test]
@@ -46,7 +53,13 @@ namespace Tests.Other
                 ErrorCodes.Common.AccessDenied,
                 ErrorCodes.User.FirstNameInvalid,
                 ErrorCodes.User.LastNameInvalid,
-                ErrorCodes.User.BioInvalid
+                ErrorCodes.User.BioInvalid,
+                ErrorCodes.User.EmailInvalid,
+                ErrorCodes.User.EmailTaken,
+                ErrorCodes.User.EmailUnchanged,
+                ErrorCodes.Verification.CodeInvalid,
+                ErrorCodes.Verification.CodeExpired,
+                ErrorCodes.Verification.AttemptsExceeded
             };
 
             await Assert.That(codes.Distinct().Count()).IsEqualTo(codes.Length);

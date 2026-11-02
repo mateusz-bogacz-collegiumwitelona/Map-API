@@ -14,12 +14,20 @@ namespace Infrastructure.Configurations
                 .HasMaxLength(10)
                 .IsRequired();
 
+            builder.Property(c => c.Purpose)
+                .HasMaxLength(32)
+                .IsRequired();
+
+            builder.Property(c => c.NewEmail)
+                .HasMaxLength(256);
+
             builder.HasOne(c => c.User)
                 .WithMany()
                 .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasIndex(c => new { c.UserId, c.Code });
+            builder.HasIndex(c => new { c.UserId, c.Purpose });
         }
     }
 }

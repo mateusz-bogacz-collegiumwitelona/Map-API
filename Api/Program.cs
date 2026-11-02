@@ -1,6 +1,7 @@
 using Api.Configuration;
 using Api.Mappers;
 using Api.Middlewares;
+using Email;
 using Infrastructure;
 using Serilog;
 using Services;
@@ -34,6 +35,7 @@ try
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     builder.Services.AddProblemDetails();
     builder.Services.AddApplicationServices(builder.Configuration);
+    builder.Services.AddEmailServices(builder.Configuration);
 
     var app = builder.Build();
 
