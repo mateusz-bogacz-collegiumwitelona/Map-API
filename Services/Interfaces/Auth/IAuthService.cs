@@ -13,5 +13,6 @@ namespace Services.Interfaces.Auth
 
         Task<Result> LogoutAsync(string refreshToken, CancellationToken cancellationToken = default);
         Task<Result<string>> RegisterAsync(RegisterCommand command, CancellationToken ct = default);
+        Task<Result> ConfirmEmailAsync(ConfirmEmailCommand command, CancellationToken ct = default);
     }
 }

@@ -11,6 +11,7 @@
         public const string InvalidRefreshToken = "AUTH_003";
         public const string AccountLocked = "AUTH_004";
         public const string AccountBanned = "AUTH_005";
+        public const string InvalidVerificationCode = "AUTH_006";
         #endregion
 
         #region Validation
@@ -18,7 +19,6 @@
         #endregion
 
         #region Common
-
         public const string InvalidOperation = "COMMON_001";
         public const string NotFound = "COMMON_002";
         public const string BadRequest = "COMMON_003";

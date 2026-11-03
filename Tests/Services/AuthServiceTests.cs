@@ -1,4 +1,5 @@
 using Domain.Const;
+using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
@@ -883,11 +884,12 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task RegisterAsync_WhenPasswordDoesNotMeetComplexityRules_FailsAndRollsBackTransaction()
+        public async Task RegisterAsync_WhenPasswordDoesNotMeetComplexityRules_ThrowsInternalServerExceptionAndRollsBackTransaction()
         {
             // Arrange
-            var command = new RegisterCommand { 
-                FirstName =  "Piotr",
+            var command = new RegisterCommand
+            {
+                FirstName = "Piotr",
                 LastName = "Zieliński",
                 Email = "piotr@example.com",
                 Password = "short",
@@ -897,13 +899,11 @@ namespace Tests.Services
             var initialUserCount = await Context.Users.CountAsync();
             var initialCodeCount = await Context.EmailVerificationCodes.CountAsync();
 
-            // Act
-            var result = await Sut.RegisterAsync(command);
-
-            // Assert
-            await Assert.That(result.IsSuccess).IsFalse();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status500InternalServerError);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await Sut.RegisterAsync(command);
+            }).Throws<InternalServerException>();
 
             Context.ChangeTracker.Clear();
 
@@ -942,6 +942,373 @@ namespace Tests.Services
             // Assert
             await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
             await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
+        }
+
+        #endregion
+
+        #region ConfirmEmailAsync Tests
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenCodeIsValid_ConfirmsEmailMarksCodeAsUsedAndReturnsSuccess()
+        {
+            // Arrange
+            var user = await CreateUserAsync("confirm-success@example.com", emailConfirmed: false);
+            var validCode = "123456";
+
+            var verificationCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = validCode,
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(verificationCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand
+            {
+                Code = validCode,
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("Email confirmed successfully.");
+
+            Context.ChangeTracker.Clear();
+
+            var updatedUser = await UserManager.FindByIdAsync(user.Id.ToString());
+            await Assert.That(updatedUser).IsNotNull();
+            await Assert.That(updatedUser!.EmailConfirmed).IsTrue();
+
+            var storedCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == verificationCode.Id);
+
+            await Assert.That(storedCode.IsUsed).IsTrue();
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenUserDoesNotExist_ReturnsBadRequestWithoutLeakingState()
+        {
+            // Arrange
+            var command = new ConfirmEmailCommand
+            {
+                Code = "123456",
+                Email = "nonexistent@example.com"
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+            await Assert.That(result.Message).IsEqualTo("Invalid email or token.");
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenEmailAlreadyConfirmed_ReturnsSuccessWithoutTouchingCodes()
+        {
+            // Arrange
+            var user = await CreateUserAsync("already-confirmed@example.com", emailConfirmed: true);
+            var command = new ConfirmEmailCommand
+            {
+                Code = "123456",
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("Email is already confirmed.");
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenNoActiveCodeFound_ReturnsBadRequest()
+        {
+            // Arrange
+            var user = await CreateUserAsync("no-code@example.com", emailConfirmed: false);
+
+            var usedCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = "654321",
+                ExpiredAt = DateTime.UtcNow.AddHours(1),
+                AttemptsCount = 0,
+                IsUsed = true
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(usedCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand
+            {
+                Code = "654321",
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+            await Assert.That(result.Message).IsEqualTo("Invalid email or token.");
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenCodeHasExpired_MarksCodeAsUsedAndReturnsBadRequest()
+        {
+            // Arrange
+            var user = await CreateUserAsync("expired-code@example.com", emailConfirmed: false);
+            var expiredCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = "111222",
+                ExpiredAt = DateTime.UtcNow.AddMinutes(-5),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(expiredCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand
+            {
+                Code = "111222",
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+            await Assert.That(result.Message).IsEqualTo("Verification code has expired. Please request a new verification code.");
+
+            Context.ChangeTracker.Clear();
+
+            var storedCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == expiredCode.Id);
+
+            await Assert.That(storedCode.IsUsed).IsTrue();
+
+            var updatedUser = await UserManager.FindByIdAsync(user.Id.ToString());
+            await Assert.That(updatedUser!.EmailConfirmed).IsFalse();
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenCodeIsIncorrect_IncrementsAttemptsCount()
+        {
+            // Arrange
+            var user = await CreateUserAsync("wrong-code@example.com", emailConfirmed: false);
+            var correctCode = "123456";
+
+            var verificationCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = correctCode,
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 1,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(verificationCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand
+            {
+                Code = "999999",
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+            await Assert.That(result.Message).IsEqualTo("Invalid verification code.");
+
+            Context.ChangeTracker.Clear();
+
+            var storedCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == verificationCode.Id);
+
+            await Assert.That(storedCode.AttemptsCount).IsEqualTo(2);
+            await Assert.That(storedCode.IsUsed).IsFalse();
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenFifthFailedAttemptReached_MarksCodeAsUsedAndFails()
+        {
+            // Arrange
+            var user = await CreateUserAsync("fifth-attempt@example.com", emailConfirmed: false);
+
+            var verificationCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = "123456",
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 4,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(verificationCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand
+            {
+                Code = "000000",
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+
+            Context.ChangeTracker.Clear();
+
+            var storedCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == verificationCode.Id);
+
+            await Assert.That(storedCode.AttemptsCount).IsEqualTo(5);
+            await Assert.That(storedCode.IsUsed).IsTrue();
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenCodeAlreadyHasMaxAttempts_BlocksAttemptWithTooManyRequests()
+        {
+            // Arrange
+            var user = await CreateUserAsync("max-attempts@example.com", emailConfirmed: false);
+
+            var verificationCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = "123456",
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 5,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(verificationCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand 
+            { 
+                Code = "123456",
+                Email = user.Email!
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status429TooManyRequests);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.AccountLocked);
+            await Assert.That(result.Message).IsEqualTo("Maximum verification attempts reached. Please request a new verification code.");
+
+            Context.ChangeTracker.Clear();
+
+            var storedCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == verificationCode.Id);
+
+            await Assert.That(storedCode.IsUsed).IsTrue();
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenMultipleCodesExist_PicksLatestCreatedActiveCode()
+        {
+            // Arrange
+            var user = await CreateUserAsync("latest-code@example.com", emailConfirmed: false);
+
+            var olderCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = "111111",
+                ExpiredAt = DateTime.UtcNow.AddHours(1),
+                CreatedAt = DateTime.UtcNow.AddMinutes(-30),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            var newerCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Code = "222222",
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                CreatedAt = DateTime.UtcNow.AddMinutes(-5),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddRangeAsync(olderCode, newerCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ConfirmEmailCommand
+            {
+                Email = user.Email!,
+                Code = "222222"
+            };
+
+            // Act
+            var result = await Sut.ConfirmEmailAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+
+            Context.ChangeTracker.Clear();
+
+            var storedNewerCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == newerCode.Id);
+
+            await Assert.That(storedNewerCode.IsUsed).IsTrue();
+        }
+
+        [Test]
+        public async Task ConfirmEmailAsync_WhenTokenIsAlreadyCancelled_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var command = new ConfirmEmailCommand
+            {
+                Email = "cancelled@example.com",
+                Code =  "123456"
+            };
+
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await Sut.ConfirmEmailAsync(command, cts.Token);
+            }).Throws<OperationCanceledException>();
         }
 
         #endregion

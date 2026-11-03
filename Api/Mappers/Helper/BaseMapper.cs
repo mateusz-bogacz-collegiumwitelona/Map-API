@@ -24,5 +24,9 @@ namespace Api.Mappers.Helper
 
             return NameCaseFormatter.Format(trimmed) ?? string.Empty;
         }
+
+
+        [UserMapping(Default = false)]
+        protected string Trim(string value) => value.Trim();
     }
 }

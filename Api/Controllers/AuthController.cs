@@ -75,8 +75,19 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         public async Task<IActionResult> RegisterAsync([FromBody] RegisterRequest request)
         {
-            var command = _authMapper.ToRegisterCommand(request);
-            var result = await _authService.RegisterAsync(command);
+            var result = await _authService.RegisterAsync(_authMapper.ToRegisterCommand(request));
+            return HandleResult(result);
+        }
+
+        [HttpPost("confirm-email")]
+        [AllowAnonymous]
+        [EndpointSummary("Confirm a user's email address")]
+        [EndpointDescription("Validates the supplied email confirmation code and marks the user's email address as confirmed. " +
+            "The endpoint returns 200 on success, 400 if the code is invalid or expired, and 422 if the request data is invalid.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ConfirmEmailAsync([FromBody] ConfirmEmailRequest request)
+        {
+            var result = await _authService.ConfirmEmailAsync(_authMapper.ToConfirmEmail(request));
             return HandleResult(result);
         }
     }
