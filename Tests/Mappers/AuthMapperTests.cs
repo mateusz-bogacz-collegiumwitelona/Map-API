@@ -42,7 +42,8 @@ public class AuthMapperTests
             Email = "  jan.kowalski@example.com  ",
             Password = "Password123!",
             ConfirmPassword = "Password123!",
-            Bio = "Software Developer"
+            Bio = "Software Developer",
+            IsPublic = true
         };
 
         // Act
@@ -54,6 +55,7 @@ public class AuthMapperTests
         await Assert.That(command.Email).IsEqualTo("jan.kowalski@example.com");
         await Assert.That(command.Password).IsEqualTo("Password123!");
         await Assert.That(command.Bio).IsEqualTo("Software Developer");
+        await Assert.That(command.IsPublic).IsTrue();
     }
 
     [Test]

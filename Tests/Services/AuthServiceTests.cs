@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Services.Accessors;
+using Services.Accessors;
 using Services.Accessors.Interfaces;
 using Services.Command.Auth;
 using Services.Commands.Auth;
@@ -784,7 +785,8 @@ namespace Tests.Services
                 LastName = "Kowalski",
                 Email = "jan.kowalski@example.com",
                 Password = Password,
-                Bio = "Software Engineer"
+                Bio = "Software Engineer",
+                IsPublic = true
             };
 
             // Act
@@ -810,6 +812,7 @@ namespace Tests.Services
             await Assert.That(createdUser.LastName).IsEqualTo("Kowalski");
             await Assert.That(createdUser.Bio).IsEqualTo("Software Engineer");
             await Assert.That(createdUser.EmailConfirmed).IsFalse();
+            await Assert.That(createdUser.IsPublic).IsEqualTo(command.IsPublic);
 
             var roles = await UserManager.GetRolesAsync(createdUser);
             await Assert.That(roles).Contains("User");

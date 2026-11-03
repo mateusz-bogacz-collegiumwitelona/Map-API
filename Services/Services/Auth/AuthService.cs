@@ -170,7 +170,8 @@ namespace Services.Services.Auth
                 FirstName = command.FirstName,
                 LastName = command.LastName,
                 Bio = string.IsNullOrWhiteSpace(command.Bio) ? null : command.Bio,
-                EmailConfirmed = false
+                EmailConfirmed = false,
+                IsPublic = command.IsPublic
             };
 
             var createUser = await _userManager.CreateAsync(newUser, command.Password);
