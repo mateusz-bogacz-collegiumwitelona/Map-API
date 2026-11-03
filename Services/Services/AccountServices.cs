@@ -121,15 +121,7 @@ namespace Services.Services
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            var attemptCounted = await _context.EmailVerificationCodes
-                .Where(c => c.Id == verificationCode.Id && !c.IsUsed && c.AttemptsCount < VerificationConst.MaxAttempts)
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(c => c.AttemptsCount, c => c.AttemptsCount + 1)
-                        .SetProperty(c => c.UpdatedAt, DateTime.UtcNow),
-                    _ct);
-
-            if (attemptCounted == 0)
+            if (verificationCode.AttemptsCount >= VerificationConst.MaxAttempts)
             {
                 return Result.Failure(
                     message: "Too many incorrect attempts. Please request a new verification code.",
@@ -139,6 +131,14 @@ namespace Services.Services
 
             if (!CodesMatch(verificationCode.Code, command.Code))
             {
+                await _context.EmailVerificationCodes
+                    .Where(c => c.Id == verificationCode.Id && !c.IsUsed && c.AttemptsCount < VerificationConst.MaxAttempts)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(c => c.AttemptsCount, c => c.AttemptsCount + 1)
+                            .SetProperty(c => c.UpdatedAt, DateTime.UtcNow),
+                        _ct);
+
                 return CodeInvalid();
             }
 
