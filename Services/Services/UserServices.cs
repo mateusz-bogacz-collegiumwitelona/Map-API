@@ -18,8 +18,6 @@ namespace Services.Services
         private readonly ILogger<UserServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
 
-        private CancellationToken _ct => _ctAccessor.Token;
-
         public UserServices(
             AppDbContext context,
             ILogger<UserServices> logger,
@@ -30,8 +28,14 @@ namespace Services.Services
             _ctAccessor = ctAccessor;
         }
 
-        public async Task<Result<UserResponse>> GetUserProfileAsync(Guid currentUserId, Guid? targetUserId = null)
+        public async Task<Result<UserResponse>> GetUserProfileAsync(
+            Guid currentUserId, 
+            Guid? targetUserId = null,
+            CancellationToken ct = default
+            )
         {
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+
             var resolvedUserId = targetUserId ?? currentUserId;
             var isOwner = resolvedUserId == currentUserId;
 
@@ -46,7 +50,7 @@ namespace Services.Services
                     u.Bio,
                     u.IsPublic
                 })
-                .FirstOrDefaultAsync(_ct);
+                .FirstOrDefaultAsync(token);
 
             if (user == null || (!isOwner && !user.IsPublic))
             {
@@ -70,9 +74,14 @@ namespace Services.Services
             );
         }
 
-        public async Task<Result> EditUserAsync(Guid userId, EditUserCommand command)
+        public async Task<Result> EditUserAsync(
+            Guid userId, 
+            EditUserCommand command, 
+            CancellationToken ct = default
+            )
         {
-            var user = await GetUserAsync(userId);
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+            var user = await GetUserAsync(userId, token);
 
             if (!string.IsNullOrWhiteSpace(command.FirstName))
             {
@@ -89,7 +98,7 @@ namespace Services.Services
                 user.Bio = string.IsNullOrWhiteSpace(command.Bio) ? null : command.Bio.Trim();
             }
 
-            await _context.SaveChangesAsync(_ct);
+            await _context.SaveChangesAsync(token);
 
             _logger.LogInformation("User data updated for user ID: {UserId}", userId);
 
@@ -99,9 +108,13 @@ namespace Services.Services
                 );
         }
 
-        public async Task<Result> SetProfileVisibilityAsync(Guid userId, bool isPublic)
+        public async Task<Result> SetProfileVisibilityAsync(
+            Guid userId, 
+            bool isPublic,
+            CancellationToken ct = default)
         {
-            var user = await GetUserAsync(userId);
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+            var user = await GetUserAsync(userId, token);
 
             if (user.IsPublic == isPublic)
             {
@@ -112,7 +125,7 @@ namespace Services.Services
             }
 
             user.IsPublic = isPublic;
-            await _context.SaveChangesAsync(_ct);
+            await _context.SaveChangesAsync(token);
 
             _logger.LogInformation("Profile visibility updated for user ID: {UserId} to {Visibility}", userId, isPublic ? "public" : "private");
 
@@ -122,9 +135,9 @@ namespace Services.Services
             );
         }
 
-        private async Task<User> GetUserAsync(Guid userId)
+        private async Task<User> GetUserAsync(Guid userId, CancellationToken token)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, _ct);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId, token);
 
             if (user == null)
             {

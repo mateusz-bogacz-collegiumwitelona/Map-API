@@ -4,6 +4,7 @@ using Services.Accessors.Interfaces;
 using Services.Commands.Auth;
 using Services.Interfaces.Auth;
 using Services.Services.Auth;
+using Tests.Fakes;
 
 namespace Tests.Auth;
 
@@ -16,7 +17,7 @@ public class AuthServiceCancellationTests
         using var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
 
-        var accessor = new StubCancellationTokenAccessor();
+        var accessor = new FakeCancellationTokenAccessor();
         var tokenService = new RecordingTokenService();
         var sut = CreateSut(tokenService, accessor);
 
@@ -37,7 +38,7 @@ public class AuthServiceCancellationTests
         using var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
 
-        var accessor = new StubCancellationTokenAccessor();
+        var accessor = new FakeCancellationTokenAccessor();
         var tokenService = new RecordingTokenService();
         var sut = CreateSut(tokenService, accessor);
 
@@ -57,7 +58,7 @@ public class AuthServiceCancellationTests
         using var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.Cancel();
 
-        var accessor = new StubCancellationTokenAccessor { Token = cancellationTokenSource.Token };
+        var accessor = new FakeCancellationTokenAccessor { Token = cancellationTokenSource.Token };
         var tokenService = new RecordingTokenService();
         var sut = CreateSut(tokenService, accessor);
 
@@ -71,24 +72,23 @@ public class AuthServiceCancellationTests
     }
 
     [Test]
-    public async Task LogoutAsync_WhenAccessorTokenCancelledAndMethodTokenProvided_Throws()
+    public async Task LogoutAsync_WhenAccessorTokenCancelledAndMethodTokenProvided_PrefersActiveMethodToken()
     {
         // Arrange
         using var methodCancellationTokenSource = new CancellationTokenSource();
         using var accessorCancellationTokenSource = new CancellationTokenSource();
         accessorCancellationTokenSource.Cancel();
 
-        var accessor = new StubCancellationTokenAccessor { Token = accessorCancellationTokenSource.Token };
+        var accessor = new FakeCancellationTokenAccessor { Token = accessorCancellationTokenSource.Token };
         var tokenService = new RecordingTokenService();
         var sut = CreateSut(tokenService, accessor);
 
-        // Act & Assert
-        await Assert.That(async () =>
-        {
-            await sut.LogoutAsync("refresh-token", methodCancellationTokenSource.Token);
-        }).Throws<OperationCanceledException>();
+        // Act
+        await sut.LogoutAsync("refresh-token", methodCancellationTokenSource.Token);
 
-        await Assert.That(tokenService.WasCalled).IsFalse();
+        // Assert
+        await Assert.That(tokenService.WasCalled).IsTrue();
+        await Assert.That(tokenService.LastCancellationToken).IsEqualTo(methodCancellationTokenSource.Token);
     }
 
     [Test]
@@ -96,7 +96,7 @@ public class AuthServiceCancellationTests
     {
         // Arrange
         using var cancellationTokenSource = new CancellationTokenSource();
-        var accessor = new StubCancellationTokenAccessor { Token = cancellationTokenSource.Token };
+        var accessor = new FakeCancellationTokenAccessor { Token = cancellationTokenSource.Token };
         var tokenService = new RecordingTokenService();
         var sut = CreateSut(tokenService, accessor);
 
@@ -114,7 +114,7 @@ public class AuthServiceCancellationTests
         // Arrange
         using var methodCancellationTokenSource = new CancellationTokenSource();
         using var accessorCancellationTokenSource = new CancellationTokenSource();
-        var accessor = new StubCancellationTokenAccessor { Token = accessorCancellationTokenSource.Token };
+        var accessor = new FakeCancellationTokenAccessor { Token = accessorCancellationTokenSource.Token };
         var tokenService = new RecordingTokenService();
         var sut = CreateSut(tokenService, accessor);
 
@@ -129,21 +129,12 @@ public class AuthServiceCancellationTests
     private static AuthService CreateSut(ITokenService tokenService, ICancellationTokenAccessor accessor)
         => new(null!, tokenService, new PasswordHasher<User>(), accessor);
 
-    private sealed class StubCancellationTokenAccessor : ICancellationTokenAccessor
-    {
-        public CancellationToken Token { get; set; }
-    }
-
     private sealed class RecordingTokenService : ITokenService
     {
         public bool WasCalled { get; private set; }
-
         public bool GenerateAccessTokenCalled { get; private set; }
-
         public bool CreateRefreshTokenCalled { get; private set; }
-
         public bool ConsumeRefreshTokenCalled { get; private set; }
-
         public CancellationToken LastCancellationToken { get; private set; }
 
         public (string Token, DateTime ExpiresAt) GenerateAccessToken(User user, IEnumerable<string> roles)
@@ -152,13 +143,11 @@ public class AuthServiceCancellationTests
             return ("access-token", DateTime.UtcNow);
         }
 
-        public string GenerateRefreshToken()
-            => throw new NotSupportedException();
+        public string GenerateRefreshToken() => throw new NotSupportedException();
 
         public Task<RefreshToken> CreateRefreshTokenAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             CreateRefreshTokenCalled = true;
-
             return Task.FromResult(new RefreshToken
             {
                 UserId = userId,

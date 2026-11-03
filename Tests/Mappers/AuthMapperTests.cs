@@ -1,7 +1,7 @@
 using Api.Mappers;
 using Api.Request.Auth;
 
-namespace Tests.Auth;
+namespace Tests.Mappers;
 
 public class AuthMapperTests
 {

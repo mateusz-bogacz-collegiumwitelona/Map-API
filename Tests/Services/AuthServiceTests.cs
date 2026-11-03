@@ -18,7 +18,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace Tests.Auth
+namespace Tests.Services
 {
     public class AuthServiceTests
     {
@@ -245,8 +245,8 @@ namespace Tests.Auth
             await Assert.That(unknownEmailResult.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
             await Assert.That(wrongPasswordResult.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
 
-            await Assert.That(unknownEmailResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidCredentials);
-            await Assert.That(wrongPasswordResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidCredentials);
+            await Assert.That(unknownEmailResult.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+            await Assert.That(wrongPasswordResult.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
 
             await Assert.That(unknownEmailResult.Message).IsEqualTo("Invalid email or password.");
             await Assert.That(wrongPasswordResult.Message).IsEqualTo(unknownEmailResult.Message);
@@ -286,7 +286,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status423Locked);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Auth.AccountLocked);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.AccountLocked);
             await Assert.That(result.Data).IsNull();
         }
 
@@ -305,12 +305,12 @@ namespace Tests.Auth
                 if (attempt < MaxFailedAccessAttempts)
                 {
                     await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-                    await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidCredentials);
+                    await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
                 }
                 else
                 {
                     await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status423Locked);
-                    await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Auth.AccountLocked);
+                    await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.AccountLocked);
                 }
             }
 
@@ -327,7 +327,7 @@ namespace Tests.Auth
             var failedResult = await Sut.LoginAsync(new LoginCommand(user.Email!, "WrongPassword123!"));
 
             // Assert
-            await Assert.That(failedResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidCredentials);
+            await Assert.That(failedResult.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
             await Assert.That(await UserManager.GetAccessFailedCountAsync(user)).IsEqualTo(1);
 
             // Act
@@ -350,7 +350,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidCredentials);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
             await Assert.That(result.Message).IsEqualTo("Invalid email or password.");
             await Assert.That(result.Data).IsNull();
 
@@ -372,7 +372,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Auth.AccountBanned);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.AccountBanned);
             await Assert.That(result.Message).IsEqualTo("Account is banned.");
             await Assert.That(result.Data).IsNull();
 
@@ -411,7 +411,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidCredentials);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
             await Assert.That(result.Data).IsNull();
         }
 
@@ -465,7 +465,7 @@ namespace Tests.Auth
 
             await Assert.That(refreshResult.IsSuccess).IsFalse();
             await Assert.That(refreshResult.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidRefreshToken);
+            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.InvalidRefreshToken);
             await Assert.That(refreshResult.Data).IsNull();
 
             await Assert.That(await Context.RefreshTokens.CountAsync()).IsEqualTo(1);
@@ -501,7 +501,7 @@ namespace Tests.Auth
 
             await Assert.That(secondRefreshResult.IsSuccess).IsFalse();
             await Assert.That(secondRefreshResult.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-            await Assert.That(secondRefreshResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidRefreshToken);
+            await Assert.That(secondRefreshResult.ErrorCode).IsEqualTo(ErrorCodes.InvalidRefreshToken);
             await Assert.That(secondRefreshResult.Data).IsNull();
         }
 
@@ -522,7 +522,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(refreshResult.IsSuccess).IsFalse();
             await Assert.That(refreshResult.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
-            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.EmailNotConfirmed);
+            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.EmailNotConfirmed);
             await Assert.That(refreshResult.Data).IsNull();
 
             Context.ChangeTracker.Clear();
@@ -555,7 +555,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(refreshResult.IsSuccess).IsFalse();
             await Assert.That(refreshResult.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
-            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.AccountBanned);
+            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.AccountBanned);
             await Assert.That(refreshResult.Data).IsNull();
 
             Context.ChangeTracker.Clear();
@@ -589,7 +589,7 @@ namespace Tests.Auth
             // Assert
             await Assert.That(refreshResult.IsSuccess).IsFalse();
             await Assert.That(refreshResult.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.Auth.InvalidRefreshToken);
+            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.InvalidRefreshToken);
             await Assert.That(refreshResult.Data).IsNull();
 
             await Assert.That(await Context.RefreshTokens.CountAsync()).IsEqualTo(1);

@@ -3,7 +3,7 @@ using Api.Validators.Validators.Auth;
 using Domain.Const;
 using FluentValidation.Results;
 
-namespace Tests.Auth;
+namespace Tests.Validators;
 
 public class RefreshTokenRequestValidatorTests
 {
@@ -65,6 +65,6 @@ public class RefreshTokenRequestValidatorTests
 
         var error = result.Errors[0];
         await Assert.That(error.PropertyName).IsEqualTo(nameof(RefreshTokenRequest.RefreshToken));
-        await Assert.That(error.ErrorCode).IsEqualTo(ErrorCodes.Validation.ValidationError);
+        await Assert.That(error.ErrorCode).IsEqualTo(ErrorCodes.ValidationError);
     }
 }

@@ -7,24 +7,24 @@ namespace Tests.Other
         [Test]
         public async Task ErrorCodes_UseStructuredDomainPrefixedValues()
         {
-            await Assert.That(ErrorCodes.Auth.InvalidCredentials).IsEqualTo("AUTH_001");
-            await Assert.That(ErrorCodes.Auth.EmailNotConfirmed).IsEqualTo("AUTH_002");
-            await Assert.That(ErrorCodes.Auth.InvalidRefreshToken).IsEqualTo("AUTH_003");
-            await Assert.That(ErrorCodes.Auth.AccountLocked).IsEqualTo("AUTH_004");
-            await Assert.That(ErrorCodes.Auth.AccountBanned).IsEqualTo("AUTH_005");
+            await Assert.That(ErrorCodes.InvalidCredentials).IsEqualTo("AUTH_001");
+            await Assert.That(ErrorCodes.EmailNotConfirmed).IsEqualTo("AUTH_002");
+            await Assert.That(ErrorCodes.InvalidRefreshToken).IsEqualTo("AUTH_003");
+            await Assert.That(ErrorCodes.AccountLocked).IsEqualTo("AUTH_004");
+            await Assert.That(ErrorCodes.AccountBanned).IsEqualTo("AUTH_005");
 
-            await Assert.That(ErrorCodes.Validation.ValidationError).IsEqualTo("VALIDATION_001");
+            await Assert.That(ErrorCodes.ValidationError).IsEqualTo("VALIDATION_001");
 
-            await Assert.That(ErrorCodes.Common.InvalidOperation).IsEqualTo("COMMON_001");
-            await Assert.That(ErrorCodes.Common.NotFound).IsEqualTo("COMMON_002");
-            await Assert.That(ErrorCodes.Common.BadRequest).IsEqualTo("COMMON_003");
-            await Assert.That(ErrorCodes.Common.InternalError).IsEqualTo("COMMON_004");
-            await Assert.That(ErrorCodes.Common.TooManyRequests).IsEqualTo("COMMON_005");
-            await Assert.That(ErrorCodes.Common.AccessDenied).IsEqualTo("ACCESS_DENIED");
+            await Assert.That(ErrorCodes.InvalidOperation).IsEqualTo("COMMON_001");
+            await Assert.That(ErrorCodes.NotFound).IsEqualTo("COMMON_002");
+            await Assert.That(ErrorCodes.BadRequest).IsEqualTo("COMMON_003");
+            await Assert.That(ErrorCodes.InternalError).IsEqualTo("COMMON_004");
+            await Assert.That(ErrorCodes.TooManyRequests).IsEqualTo("COMMON_005");
+            await Assert.That(ErrorCodes.AccessDenied).IsEqualTo("ACCESS_DENIED");
 
-            await Assert.That(ErrorCodes.User.FirstNameInvalid).IsEqualTo("USR_001");
-            await Assert.That(ErrorCodes.User.LastNameInvalid).IsEqualTo("USR_002");
-            await Assert.That(ErrorCodes.User.BioInvalid).IsEqualTo("USR_003");
+            await Assert.That(ErrorCodes.FirstNameInvalid).IsEqualTo("USR_001");
+            await Assert.That(ErrorCodes.LastNameInvalid).IsEqualTo("USR_002");
+            await Assert.That(ErrorCodes.BioInvalid).IsEqualTo("USR_003");
         }
 
         [Test]
@@ -32,21 +32,21 @@ namespace Tests.Other
         {
             var codes = new[]
             {
-                ErrorCodes.Auth.InvalidCredentials,
-                ErrorCodes.Auth.EmailNotConfirmed,
-                ErrorCodes.Auth.InvalidRefreshToken,
-                ErrorCodes.Auth.AccountLocked,
-                ErrorCodes.Auth.AccountBanned,
-                ErrorCodes.Validation.ValidationError,
-                ErrorCodes.Common.InvalidOperation,
-                ErrorCodes.Common.NotFound,
-                ErrorCodes.Common.BadRequest,
-                ErrorCodes.Common.InternalError,
-                ErrorCodes.Common.TooManyRequests,
-                ErrorCodes.Common.AccessDenied,
-                ErrorCodes.User.FirstNameInvalid,
-                ErrorCodes.User.LastNameInvalid,
-                ErrorCodes.User.BioInvalid
+                ErrorCodes.InvalidCredentials,
+                ErrorCodes.EmailNotConfirmed,
+                ErrorCodes.InvalidRefreshToken,
+                ErrorCodes.AccountLocked,
+                ErrorCodes.AccountBanned,
+                ErrorCodes.ValidationError,
+                ErrorCodes.InvalidOperation,
+                ErrorCodes.NotFound,
+                ErrorCodes.BadRequest,
+                ErrorCodes.InternalError,
+                ErrorCodes.TooManyRequests,
+                ErrorCodes.AccessDenied,
+                ErrorCodes.FirstNameInvalid,
+                ErrorCodes.LastNameInvalid,
+                ErrorCodes.BioInvalid
             };
 
             await Assert.That(codes.Distinct().Count()).IsEqualTo(codes.Length);
