@@ -6,7 +6,7 @@ using Services.Interfaces.Auth;
 using Services.Services.Auth;
 using Tests.Fakes;
 
-namespace Tests.Auth;
+namespace Tests.Other;
 
 public class AuthServiceCancellationTests
 {

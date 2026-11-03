@@ -29,7 +29,7 @@ namespace Services.Services
         }
 
         public async Task<Result<UserResponse>> GetUserProfileAsync(
-            Guid currentUserId, 
+            Guid currentUserId,
             Guid? targetUserId = null,
             CancellationToken ct = default
             )
@@ -75,8 +75,8 @@ namespace Services.Services
         }
 
         public async Task<Result> EditUserAsync(
-            Guid userId, 
-            EditUserCommand command, 
+            Guid userId,
+            EditUserCommand command,
             CancellationToken ct = default
             )
         {
@@ -109,7 +109,7 @@ namespace Services.Services
         }
 
         public async Task<Result> SetProfileVisibilityAsync(
-            Guid userId, 
+            Guid userId,
             bool isPublic,
             CancellationToken ct = default)
         {

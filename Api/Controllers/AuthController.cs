@@ -4,7 +4,6 @@ using Api.Mappers;
 using Api.Request.Auth;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Services.Interfaces.Auth;

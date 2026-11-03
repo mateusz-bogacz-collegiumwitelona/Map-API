@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
 using Services.Commands.Auth;
@@ -17,6 +16,7 @@ using Services.Services.Auth;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Testcontainers.PostgreSql;
 
 namespace Tests.Services
 {
