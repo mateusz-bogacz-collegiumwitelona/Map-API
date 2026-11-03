@@ -31,6 +31,7 @@
         public const string FirstNameInvalid = "USR_001";
         public const string LastNameInvalid = "USR_002";
         public const string BioInvalid = "USR_003";
+        public const string EmailAlreadyExist = "USR_004";
         #endregion
     }
 }

@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
+using Services.Command.Auth;
 using Services.Commands.Auth;
 using Services.Interfaces.Auth;
 using Services.Options;
@@ -771,6 +772,180 @@ namespace Tests.Services
 
         #endregion
 
+        #region RegisterAsync Tests
+
+        [Test]
+        public async Task RegisterAsync_WhenCommandIsValid_PersistsUserWithRoleAndReturnsVerificationCode()
+        {
+            // Arrange
+            var command = new RegisterCommand {
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                Email = "jan.kowalski@example.com",
+                Password = Password,
+                Bio = "Software Engineer"
+            };
+
+            // Act
+            var result = await Sut.RegisterAsync(command);
+
+            // Assert
+
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status201Created);
+            await Assert.That(result.Message).IsEqualTo("User registered successfully.");
+            await Assert.That(result.Data).IsNotNull();
+
+            var rawCode = result.Data!;
+            await Assert.That(rawCode.Length).IsEqualTo(6);
+            await Assert.That(int.TryParse(rawCode, out _)).IsTrue();
+
+            Context.ChangeTracker.Clear();
+
+            var createdUser = await UserManager.FindByEmailAsync(command.Email);
+            await Assert.That(createdUser).IsNotNull();
+            await Assert.That(createdUser!.UserName).IsEqualTo(command.Email);
+            await Assert.That(createdUser.FirstName).IsEqualTo("Jan");
+            await Assert.That(createdUser.LastName).IsEqualTo("Kowalski");
+            await Assert.That(createdUser.Bio).IsEqualTo("Software Engineer");
+            await Assert.That(createdUser.EmailConfirmed).IsFalse();
+
+            var roles = await UserManager.GetRolesAsync(createdUser);
+            await Assert.That(roles).Contains("User");
+            await Assert.That(roles).DoesNotContain("Admin");
+
+            // Assert
+            var verificationCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleOrDefaultAsync(c => c.UserId == createdUser.Id);
+
+            await Assert.That(verificationCode).IsNotNull();
+            await Assert.That(verificationCode!.Code).IsEqualTo(rawCode);
+            await Assert.That(verificationCode.IsUsed).IsFalse();
+            await Assert.That(verificationCode.AttemptsCount).IsEqualTo(0);
+            await Assert.That(verificationCode.ExpiredAt).IsGreaterThan(DateTime.UtcNow);
+        }
+
+        [Test]
+        public async Task RegisterAsync_WhenBioIsWhitespaceOrNull_NormalizesBioToNull()
+        {
+            // Arrange
+            var command = new RegisterCommand { 
+                FirstName = "Anna",
+                LastName = "Nowak",
+                Email = "anna.nowak@example.com",
+                Password = Password,
+                Bio = "   "
+            };
+
+            // Act
+            var result = await Sut.RegisterAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            Context.ChangeTracker.Clear();
+
+            var createdUser = await UserManager.FindByEmailAsync(command.Email);
+            await Assert.That(createdUser).IsNotNull();
+            await Assert.That(createdUser!.Bio).IsNull();
+        }
+
+        [Test]
+        public async Task RegisterAsync_WhenEmailAlreadyExists_ReturnsAntiEnumerationSuccessWithoutCreatingDuplicate()
+        {
+            // Arrange
+            var existingUser = await CreateUserAsync("existing@example.com");
+            var initialUserCount = await Context.Users.CountAsync();
+            var initialCodeCount = await Context.EmailVerificationCodes.CountAsync();
+
+            var command = new RegisterCommand { 
+                FirstName = "Clone",
+                LastName = "User",
+                Email = existingUser.Email!,
+                Password = Password,
+                Bio = null
+            };
+
+            // Act
+            var result = await Sut.RegisterAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("If the email is valid, a verification code has been generated.");
+            await Assert.That(result.Data).IsEqualTo(string.Empty);
+
+            Context.ChangeTracker.Clear();
+
+            await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
+            await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
+        }
+
+        [Test]
+        public async Task RegisterAsync_WhenPasswordDoesNotMeetComplexityRules_FailsAndRollsBackTransaction()
+        {
+            // Arrange
+            var command = new RegisterCommand { 
+                FirstName =  "Piotr",
+                LastName = "Zieliński",
+                Email = "piotr@example.com",
+                Password = "short",
+                Bio = null
+            };
+
+            var initialUserCount = await Context.Users.CountAsync();
+            var initialCodeCount = await Context.EmailVerificationCodes.CountAsync();
+
+            // Act
+            var result = await Sut.RegisterAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status500InternalServerError);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InternalError);
+
+            Context.ChangeTracker.Clear();
+
+            await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
+            await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
+            await Assert.That(await UserManager.FindByEmailAsync(command.Email)).IsNull();
+        }
+
+        [Test]
+        public async Task RegisterAsync_WhenTokenIsAlreadyCancelled_ThrowsOperationCanceledExceptionWithoutPersistingData()
+        {
+            // Arrange
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var command = new RegisterCommand { 
+                FirstName =  "Tomasz",
+                LastName = "Kot",
+                Email = "tomasz@example.com",
+                Password = Password,
+                Bio = null
+            };
+
+
+            var initialUserCount = await Context.Users.CountAsync();
+            var initialCodeCount = await Context.EmailVerificationCodes.CountAsync();
+
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await Sut.RegisterAsync(command, cts.Token);
+            }).Throws<OperationCanceledException>();
+
+            Context.ChangeTracker.Clear();
+
+            // Assert
+            await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
+            await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
+        }
+
+        #endregion
+
         #region Shared Test Helpers
 
         private async Task CreateRoleAsync(string roleName)
@@ -850,5 +1025,6 @@ namespace Tests.Services
         }
 
         #endregion
+
     }
 }

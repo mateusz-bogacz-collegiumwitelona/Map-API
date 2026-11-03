@@ -3,7 +3,7 @@ using Api.Validators.Validators.Auth;
 using Domain.Const;
 using FluentValidation.Results;
 
-namespace Tests.Validators;
+namespace Tests.Validators.Auth;
 
 public class LoginRequestValidatorTests
 {

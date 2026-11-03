@@ -1,6 +1,6 @@
 using Services.Options;
 
-namespace Tests.Validators;
+namespace Tests.Validators.Auth;
 
 public class JwtOptionsValidationTests
 {

@@ -65,5 +65,19 @@ namespace Api.Controllers
             var result = await _authService.LogoutAsync(request.RefreshToken);
             return HandleResult(result);
         }
+
+        [HttpPost("register")]
+        [AllowAnonymous]
+        [EndpointSummary("Register a new user account")]
+        [EndpointDescription("Creates a new user account with the supplied email, password, and optional first and last names. " +
+            "The account is created in an unconfirmed state and an email confirmation link is sent to the provided email address. " +
+            "The endpoint returns 200 on success, 400 if the email is already in use, and 422 if the request data is invalid.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        public async Task<IActionResult> RegisterAsync([FromBody] RegisterRequest request)
+        {
+            var command = _authMapper.ToRegisterCommand(request);
+            var result = await _authService.RegisterAsync(command);
+            return HandleResult(result);
+        }
     }
 }

@@ -1,9 +1,9 @@
 ﻿using Api.Request.User;
-using Api.Validators.User;
+using Api.Validators.Validators.User;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators
+namespace Tests.Validators.User
 {
     public class EditUserValidatorTest
     {

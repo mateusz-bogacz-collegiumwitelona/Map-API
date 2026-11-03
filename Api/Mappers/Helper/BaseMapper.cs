@@ -14,5 +14,15 @@ namespace Api.Mappers.Helper
 
             return NameCaseFormatter.Format(trimmed);
         }
+
+        [UserMapping(Default = false)]
+        protected static string NormalizeRequiredName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+            var trimmed = value.Trim();
+
+            return NameCaseFormatter.Format(trimmed) ?? string.Empty;
+        }
     }
 }

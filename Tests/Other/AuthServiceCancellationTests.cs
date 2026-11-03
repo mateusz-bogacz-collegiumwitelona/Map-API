@@ -1,5 +1,6 @@
 using Domain.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging.Abstractions;
 using Services.Accessors.Interfaces;
 using Services.Commands.Auth;
 using Services.Interfaces.Auth;
@@ -127,7 +128,13 @@ public class AuthServiceCancellationTests
     }
 
     private static AuthService CreateSut(ITokenService tokenService, ICancellationTokenAccessor accessor)
-        => new(null!, tokenService, new PasswordHasher<User>(), accessor);
+    => new(
+        userManager: null!,
+        tokenService: tokenService,
+        passwordHasher: new PasswordHasher<User>(),
+        ctAccessor: accessor,
+        dbContext: null!,
+        logger: NullLogger<AuthService>.Instance);
 
     private sealed class RecordingTokenService : ITokenService
     {
