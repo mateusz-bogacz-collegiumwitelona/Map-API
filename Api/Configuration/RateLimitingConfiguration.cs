@@ -1,6 +1,7 @@
 using Domain.Common;
 using Domain.Const;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 
 namespace Api.Configuration
@@ -8,6 +9,7 @@ namespace Api.Configuration
     public static class RateLimitingConfiguration
     {
         public const string AuthPolicy = "Auth";
+        public const string EmailResendPolicy = "EmailResend";
 
         public static IServiceCollection AddRateLimitingConfiguration(this IServiceCollection services)
         {
@@ -22,6 +24,19 @@ namespace Api.Configuration
                         {
                             PermitLimit = 10,
                             Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        }));
+
+                options.AddPolicy(EmailResendPolicy, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                            ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 1,
+                            Window = TimeSpan.FromSeconds(VerificationConst.ResendCooldownSeconds),
                             QueueLimit = 0,
                             AutoReplenishment = true
                         }));

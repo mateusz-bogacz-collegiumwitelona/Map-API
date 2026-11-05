@@ -24,6 +24,7 @@ namespace Services
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserServices, UserServices>();
+            services.AddScoped<IAccountServices, AccountServices>();
 
             return services;
         }
