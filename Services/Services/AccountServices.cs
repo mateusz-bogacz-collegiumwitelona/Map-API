@@ -285,7 +285,7 @@ namespace Services.Services
             }
         }
 
-        public async Task<Result<string>> RegisterAsync(RegisterCommand command, CancellationToken ct = default)
+        public async Task<Result> RegisterAsync(RegisterCommand command, CancellationToken ct = default)
         {
             var token = _ctAccessor.ResolveCancellationToken(ct);
             token.ThrowIfCancellationRequested();
@@ -295,10 +295,10 @@ namespace Services.Services
             if (existingUser)
             {
                 _logger.LogWarning("Registration attempt for already registered email: {Email}", command.Email);
-                return Result<string>.Success(
+                return Result.Success(
                     message: "If the email is valid, a verification code has been generated.",
-                    statusCode: StatusCodes.Status200OK,
-                    data: string.Empty);
+                    statusCode: StatusCodes.Status200OK
+                    );
             }
 
             await using var transaction = await _context.Database.BeginTransactionAsync(token);
@@ -332,6 +332,7 @@ namespace Services.Services
             }
 
             var rawCode = RandomNumberGenerator.GetInt32(100_000, 1_000_000).ToString("D6");
+            const int expirationHours = 4;
 
             var codeEntity = new EmailVerificationCode
             {
@@ -347,10 +348,17 @@ namespace Services.Services
 
             await transaction.CommitAsync(token);
 
-            return Result<string>.Success(
-                message: "User registered successfully.",
-                statusCode: StatusCodes.Status201Created,
-                data: rawCode);
+            await _emailService.SendRegistrationVerificationCodeAsync(
+                toEmail: newUser.Email,
+                firstName: newUser.FirstName,
+                code: rawCode,
+                validForMinutes: expirationHours * 60,
+                cancellationToken: token
+                );
+
+            return Result.Success(
+                message: "User registered successfully. Please check your email for the verification code.",
+                statusCode: StatusCodes.Status201Created);
         }
 
         public async Task<Result> ConfirmRegisterAsync(ConfirmEmailCommand command, CancellationToken ct = default)

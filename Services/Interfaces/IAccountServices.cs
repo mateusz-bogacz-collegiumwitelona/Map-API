@@ -9,7 +9,7 @@ namespace Services.Interfaces
         Task<Result> RequestEmailChangeAsync(Guid userId, ChangeEmailCommand command);
         Task<Result> ConfirmEmailChangeAsync(Guid userId, ConfirmEmailChangeCommand command);
         Task<Result> DeleteAccountAsync(Guid userId);
-        Task<Result<string>> RegisterAsync(RegisterCommand command, CancellationToken ct = default);
+        Task<Result> RegisterAsync(RegisterCommand command, CancellationToken ct = default);
         Task<Result> ConfirmRegisterAsync(ConfirmEmailCommand command, CancellationToken ct = default);
     }
 }

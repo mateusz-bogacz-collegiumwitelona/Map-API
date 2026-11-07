@@ -753,7 +753,7 @@ namespace Tests.Services
         #region RegisterAsync Tests
 
         [Test]
-        public async Task RegisterAsync_WhenCommandIsValid_PersistsUserWithRoleAndReturnsVerificationCode()
+        public async Task RegisterAsync_WhenCommandIsValid_PersistsUserWithRoleAndSendsVerificationEmail()
         {
             // Arrange
             var command = new RegisterCommand
@@ -770,15 +770,9 @@ namespace Tests.Services
             var result = await Sut.RegisterAsync(command);
 
             // Assert
-
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status201Created);
-            await Assert.That(result.Message).IsEqualTo("User registered successfully.");
-            await Assert.That(result.Data).IsNotNull();
-
-            var rawCode = result.Data!;
-            await Assert.That(rawCode.Length).IsEqualTo(6);
-            await Assert.That(int.TryParse(rawCode, out _)).IsTrue();
+            await Assert.That(result.Message).IsEqualTo("User registered successfully. Please check your email for the verification code.");
 
             Context.ChangeTracker.Clear();
 
@@ -795,16 +789,23 @@ namespace Tests.Services
             await Assert.That(roles).Contains("User");
             await Assert.That(roles).DoesNotContain("Admin");
 
-            // Assert
             var verificationCode = await Context.EmailVerificationCodes
                 .AsNoTracking()
                 .SingleOrDefaultAsync(c => c.UserId == createdUser.Id);
 
             await Assert.That(verificationCode).IsNotNull();
-            await Assert.That(verificationCode!.Code).IsEqualTo(rawCode);
+            await Assert.That(verificationCode!.Code.Length).IsEqualTo(6);
+            await Assert.That(int.TryParse(verificationCode.Code, out _)).IsTrue();
             await Assert.That(verificationCode.IsUsed).IsFalse();
             await Assert.That(verificationCode.AttemptsCount).IsEqualTo(0);
             await Assert.That(verificationCode.ExpiredAt).IsGreaterThan(DateTime.UtcNow);
+
+            var sentEmail = _emailService.SentEmails
+                .SingleOrDefault(e => e.Type == FakeEmailService.RegistrationVerificationCodeType);
+
+            await Assert.That(sentEmail).IsNotNull();
+            await Assert.That(sentEmail!.To).IsEqualTo(command.Email);
+            await Assert.That(sentEmail.Code).IsEqualTo(verificationCode.Code);
         }
 
         [Test]
@@ -834,12 +835,13 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task RegisterAsync_WhenEmailAlreadyExists_ReturnsAntiEnumerationSuccessWithoutCreatingDuplicate()
+        public async Task RegisterAsync_WhenEmailAlreadyExists_ReturnsAntiEnumerationSuccessWithoutCreatingDuplicateOrSendingEmail()
         {
             // Arrange
             var existingUser = await CreateUserAsync("existing@example.com");
             var initialUserCount = await Context.Users.CountAsync();
             var initialCodeCount = await Context.EmailVerificationCodes.CountAsync();
+            var initialEmailsSent = _emailService.SentEmails.Count;
 
             var command = new RegisterCommand
             {
@@ -857,12 +859,12 @@ namespace Tests.Services
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
             await Assert.That(result.Message).IsEqualTo("If the email is valid, a verification code has been generated.");
-            await Assert.That(result.Data).IsEqualTo(string.Empty);
 
             Context.ChangeTracker.Clear();
 
             await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
             await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
+            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(initialEmailsSent);
         }
 
         [Test]
@@ -892,6 +894,7 @@ namespace Tests.Services
             await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
             await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
             await Assert.That(await UserManager.FindByEmailAsync(command.Email)).IsNull();
+            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(0);
         }
 
         [Test]
@@ -910,7 +913,6 @@ namespace Tests.Services
                 Bio = null
             };
 
-
             var initialUserCount = await Context.Users.CountAsync();
             var initialCodeCount = await Context.EmailVerificationCodes.CountAsync();
 
@@ -925,6 +927,29 @@ namespace Tests.Services
             // Assert
             await Assert.That(await Context.Users.CountAsync()).IsEqualTo(initialUserCount);
             await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodeCount);
+            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(0);
+        }
+
+        [Test]
+        public async Task RegisterAsync_WhenEmailCannotBeSent_ThrowsException()
+        {
+            // Arrange
+            var command = new RegisterCommand
+            {
+                FirstName = "Marek",
+                LastName = "Nowicki",
+                Email = "marek@example.com",
+                Password = Password,
+                Bio = null
+            };
+
+            _emailService.ThrowOnSend = true;
+
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await Sut.RegisterAsync(command);
+            }).Throws<InvalidOperationException>();
         }
 
         #endregion
@@ -1234,7 +1259,6 @@ namespace Tests.Services
                 UserId = user.Id,
                 Code = "111111",
                 ExpiredAt = DateTime.UtcNow.AddHours(1),
-                CreatedAt = DateTime.UtcNow.AddMinutes(-30),
                 AttemptsCount = 0,
                 IsUsed = false
             };
@@ -1244,13 +1268,20 @@ namespace Tests.Services
                 UserId = user.Id,
                 Code = "222222",
                 ExpiredAt = DateTime.UtcNow.AddHours(2),
-                CreatedAt = DateTime.UtcNow.AddMinutes(-5),
                 AttemptsCount = 0,
                 IsUsed = false
             };
 
             await Context.EmailVerificationCodes.AddRangeAsync(olderCode, newerCode);
             await Context.SaveChangesAsync();
+
+            await Context.EmailVerificationCodes
+                .Where(c => c.Id == olderCode.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.CreatedAt, DateTime.UtcNow.AddMinutes(-30)));
+
+            await Context.EmailVerificationCodes
+                .Where(c => c.Id == newerCode.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.CreatedAt, DateTime.UtcNow.AddMinutes(-5)));
 
             var command = new ConfirmEmailCommand
             {

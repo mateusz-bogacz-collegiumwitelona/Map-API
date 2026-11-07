@@ -67,6 +67,31 @@ namespace Email.Templates
                 </html>
                 """;
 
+        public static EmailContent RegistrationVerificationCode(string firstName, string code, int validForMinutes)
+        {
+            const string subject = "Verify your account";
+
+            var html = Layout(subject, $"""
+                <p>Hi {Encode(firstName)},</p>
+                <p>Use the code below in the Map app to verify your account:</p>
+                <p style="font-size:28px;font-weight:bold;letter-spacing:6px;">{Encode(code)}</p>
+                <p>The code is valid for {validForMinutes} minutes.</p>
+                <p>If you did not register, you can ignore this message.</p>
+             """);
+
+            var text = $"""
+                Hi {firstName},
+
+                Use this code in the Map app to verify your account: {code}
+
+                The code is valid for {validForMinutes} minutes.
+
+                If you did not register, you can ignore this message.
+                """;
+
+            return new EmailContent(subject, html, text);
+        }
+
         private static string Encode(string value)
             => WebUtility.HtmlEncode(value);
     }

@@ -37,14 +37,35 @@ namespace Tests.Email
             const string maliciousName = "<script>alert('x')</script>";
 
             // Act
+            var registrationEmail = EmailTemplates.RegistrationVerificationCode(maliciousName, "654321", 240);
             var codeEmail = EmailTemplates.EmailChangeCode(maliciousName, "123456", 15);
             var notification = EmailTemplates.EmailChangedNotification(maliciousName, "a<b>@example.com");
 
             // Assert
+            await Assert.That(registrationEmail.HtmlBody).DoesNotContain("<script>");
+            await Assert.That(registrationEmail.HtmlBody).Contains("&lt;script&gt;");
+
             await Assert.That(codeEmail.HtmlBody).DoesNotContain("<script>");
             await Assert.That(codeEmail.HtmlBody).Contains("&lt;script&gt;");
+
             await Assert.That(notification.HtmlBody).DoesNotContain("<script>");
             await Assert.That(notification.HtmlBody).DoesNotContain("a<b>@example.com");
+        }
+
+        [Test]
+        public async Task RegistrationVerificationCode_ShouldContainCodeAndValidityInBothBodies()
+        {
+            // Act
+            var content = EmailTemplates.RegistrationVerificationCode("Jan", "654321", 240);
+
+            // Assert
+            await Assert.That(content.Subject).IsEqualTo("Verify your account");
+            await Assert.That(content.HtmlBody).Contains("Jan");
+            await Assert.That(content.HtmlBody).Contains("654321");
+            await Assert.That(content.HtmlBody).Contains("240 minutes");
+            await Assert.That(content.TextBody).Contains("Jan");
+            await Assert.That(content.TextBody).Contains("654321");
+            await Assert.That(content.TextBody).Contains("240 minutes");
         }
     }
 }
