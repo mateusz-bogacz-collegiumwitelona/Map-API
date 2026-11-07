@@ -31,7 +31,16 @@
         public const string FirstNameInvalid = "USR_001";
         public const string LastNameInvalid = "USR_002";
         public const string BioInvalid = "USR_003";
-        public const string EmailAlreadyExist = "USR_004";
+        public const string EmailInvalid = "USR_004";
+        public const string EmailTaken = "USR_005";
+        public const string EmailUnchanged = "USR_006";
+        public const string EmailAlreadyExist = "USR_007";
+        #endregion
+
+        #region Verification
+        public const string CodeInvalid = "VER_001";
+        public const string CodeExpired = "VER_002";
+        public const string AttemptsExceeded = "VER_003";
         #endregion
     }
 }

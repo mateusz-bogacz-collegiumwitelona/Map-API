@@ -1,4 +1,5 @@
-﻿using Domain.Models.Base;
+﻿using Domain.Enum;
+using Domain.Models.Base;
 
 namespace Domain.Models
 {
@@ -6,6 +7,9 @@ namespace Domain.Models
     {
         public Guid UserId { get; set; }
         public User User { get; set; } = null!;
+
+        public VerificationPurposeEnum Purpose { get; set; } = VerificationPurposeEnum.Registration;
+        public string? NewEmail { get; set; }
 
         public string Code { get; set; } = null!;
         public DateTime ExpiredAt { get; set; }

@@ -6,6 +6,7 @@ using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Services.Interfaces;
 using Services.Interfaces.Auth;
 using Services.Response.Auth;
 
@@ -16,15 +17,6 @@ namespace Api.Controllers
     [EnableRateLimiting(RateLimitingConfiguration.AuthPolicy)]
     public class AuthController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly AuthMapper _authMapper;
-
-        public AuthController(IAuthService authService, AuthMapper authMapper)
-        {
-            _authService = authService;
-            _authMapper = authMapper;
-        }
-
         [HttpPost("login")]
         [AllowAnonymous]
         [EndpointSummary("Log in using email and password")]
@@ -33,10 +25,12 @@ namespace Api.Controllers
             "banned accounts are rejected with 403, and accounts are temporarily locked after repeated failures.")]
         [ProducesResponseType(typeof(Result<AuthResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(Result), StatusCodes.Status423Locked)]
-        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        public async Task<IActionResult> Login(
+            [FromServices] IAuthService auth,
+            [FromServices] AuthMapper mapper,
+            [FromBody] LoginRequest request)
         {
-            var command = _authMapper.ToLoginCommand(request);
-            var result = await _authService.LoginAsync(command);
+            var result = await auth.LoginAsync(mapper.ToLoginCommand(request));
             return HandleResult(result);
         }
 
@@ -47,9 +41,11 @@ namespace Api.Controllers
             "Missing, revoked, or expired refresh tokens are rejected with 401. " +
             "Banned accounts are rejected with 403 and all of their refresh tokens are revoked.")]
         [ProducesResponseType(typeof(Result<AuthResponse>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
+        public async Task<IActionResult> Refresh(
+            [FromServices] IAuthService auth,
+            [FromBody] RefreshTokenRequest request)
         {
-            var result = await _authService.RefreshAsync(request.RefreshToken);
+            var result = await auth.RefreshAsync(request.RefreshToken);
             return HandleResult(result);
         }
 
@@ -60,9 +56,12 @@ namespace Api.Controllers
             "can no longer be used to refresh the session. " +
             "The endpoint is idempotent and returns 200 when the token is already revoked or unknown.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
-        public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
+        public async Task<IActionResult> Logout(
+            [FromServices] IAuthService auth,
+            [FromBody] LogoutRequest request
+            )
         {
-            var result = await _authService.LogoutAsync(request.RefreshToken);
+            var result = await auth.LogoutAsync(request.RefreshToken);
             return HandleResult(result);
         }
 
@@ -73,9 +72,12 @@ namespace Api.Controllers
             "The account is created in an unconfirmed state and an email confirmation link is sent to the provided email address. " +
             "The endpoint returns 200 on success, 400 if the email is already in use, and 422 if the request data is invalid.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
-        public async Task<IActionResult> RegisterAsync([FromBody] RegisterRequest request)
+        public async Task<IActionResult> RegisterAsync(
+            [FromServices] IAccountServices account,
+            [FromServices] AuthMapper mapper,
+            [FromBody] RegisterRequest request)
         {
-            var result = await _authService.RegisterAsync(_authMapper.ToRegisterCommand(request));
+            var result = await account.RegisterAsync(mapper.ToRegisterCommand(request));
             return HandleResult(result);
         }
 
@@ -85,9 +87,12 @@ namespace Api.Controllers
         [EndpointDescription("Validates the supplied email confirmation code and marks the user's email address as confirmed. " +
             "The endpoint returns 200 on success, 400 if the code is invalid or expired, and 422 if the request data is invalid.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
-        public async Task<IActionResult> ConfirmEmailAsync([FromBody] ConfirmEmailRequest request)
+        public async Task<IActionResult> ConfirmRegisterAsync(
+            [FromServices] IAccountServices account,
+            [FromServices] AuthMapper mapper,
+            [FromBody] ConfirmEmailRequest request)
         {
-            var result = await _authService.ConfirmEmailAsync(_authMapper.ToConfirmEmail(request));
+            var result = await account.ConfirmRegisterAsync(mapper.ToConfirmEmail(request));
             return HandleResult(result);
         }
     }

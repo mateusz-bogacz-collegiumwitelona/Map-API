@@ -1,9 +1,11 @@
-﻿using Api.Controllers.Base;
+﻿using Api.Configuration;
+using Api.Controllers.Base;
 using Api.Mappers;
 using Api.Request.User;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Services.Interfaces;
 using Services.Response.User;
 
@@ -50,6 +52,50 @@ namespace Api.Controllers
             [FromRoute] bool isPublic)
         {
             var result = await user.SetProfileVisibilityAsync(CurrentUserId, isPublic);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Request an email address change")]
+        [EndpointDescription("Sends a 6-digit verification code to the new email address. The current email address stays active for signing in until the change is confirmed. Returns 409 when the address is already in use and 429 when a code was requested less than a minute ago. Available only for accounts with the User role.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status409Conflict)]
+        [HttpPost("email")]
+        [Authorize(Policy = AuthorizationConfiguration.UserPolicy)]
+        [EnableRateLimiting(RateLimitingConfiguration.EmailResendPolicy)]
+        public async Task<IActionResult> RequestEmailChangeAsync(
+            [FromServices] IAccountServices account,
+            [FromServices] UserMapper mapper,
+            [FromBody] ChangeEmailRequest request)
+        {
+            var result = await account.RequestEmailChangeAsync(CurrentUserId, mapper.MapChangeEmail(request));
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Confirm an email address change")]
+        [EndpointDescription("Confirms the pending email change with the verification code sent to the new address, then makes it the verified primary email and notifies the old address. Codes expire after 15 minutes and allow 5 attempts. Available only for accounts with the User role.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status409Conflict)]
+        [HttpPost("email/confirm")]
+        [Authorize(Policy = AuthorizationConfiguration.UserPolicy)]
+        [EnableRateLimiting(RateLimitingConfiguration.AuthPolicy)]
+        public async Task<IActionResult> ConfirmEmailChangeAsync(
+            [FromServices] IAccountServices account,
+            [FromServices] UserMapper mapper,
+            [FromBody] ConfirmEmailChangeRequest request)
+        {
+            var result = await account.ConfirmEmailChangeAsync(CurrentUserId, mapper.MapConfirmEmailChange(request));
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Delete own account")]
+        [EndpointDescription("Soft-deletes the current account and anonymizes its personal data while keeping relational history. All refresh tokens are revoked and the current access token stops working immediately. Available only for accounts with the User role.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [HttpDelete]
+        [Authorize(Policy = AuthorizationConfiguration.UserPolicy)]
+        public async Task<IActionResult> DeleteAccountAsync(
+            [FromServices] IAccountServices account)
+        {
+            var result = await account.DeleteAccountAsync(CurrentUserId);
             return HandleResult(result);
         }
     }

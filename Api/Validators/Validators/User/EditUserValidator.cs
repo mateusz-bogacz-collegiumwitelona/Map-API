@@ -1,6 +1,5 @@
 ﻿using Api.Request.User;
 using Api.Validators.Rule;
-using Domain.Const;
 using FluentValidation;
 
 namespace Api.Validators.Validators.User
