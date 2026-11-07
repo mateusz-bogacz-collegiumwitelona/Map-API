@@ -25,6 +25,7 @@ namespace Services
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserServices, UserServices>();
             services.AddScoped<IAccountServices, AccountServices>();
+            services.AddScoped<ITripServices, TripServices>();
 
             return services;
         }
