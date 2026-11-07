@@ -50,7 +50,7 @@ namespace Tests.Validators.Auth
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Email)
-                  .WithErrorCode(ErrorCodes.ValidationError);
+                  .WithErrorCode(ErrorCodes.EmailInvalid);
         }
 
         #endregion
@@ -70,7 +70,7 @@ namespace Tests.Validators.Auth
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Code)
-                  .WithErrorCode(ErrorCodes.InvalidVerificationCode);
+                  .WithErrorCode(ErrorCodes.CodeInvalid);
         }
 
         [Test]
@@ -90,7 +90,7 @@ namespace Tests.Validators.Auth
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Code)
-                  .WithErrorCode(ErrorCodes.InvalidVerificationCode);
+                  .WithErrorCode(ErrorCodes.CodeInvalid);
         }
 
         [Test]
@@ -109,7 +109,7 @@ namespace Tests.Validators.Auth
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Code)
-                  .WithErrorCode(ErrorCodes.InvalidVerificationCode);
+                  .WithErrorCode(ErrorCodes.CodeInvalid);
         }
 
         #endregion

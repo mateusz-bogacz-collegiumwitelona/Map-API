@@ -124,4 +124,40 @@ public class AuthMapperTests
     }
 
     #endregion
+
+    #region ResendVerificationCode Mapping Tests
+
+    [Test]
+    public async Task ToResendVerificationCode_MapsEmailAndTrimsWhitespace()
+    {
+        // Arrange
+        var request = new ResendVerificationCodeRequest
+        {
+            Email = "   jan.kowalski@example.com   "
+        };
+
+        // Act
+        var command = _mapper.ToResendVerificationCode(request);
+
+        // Assert
+        await Assert.That(command.Email).IsEqualTo("jan.kowalski@example.com");
+    }
+
+    [Test]
+    public async Task ToResendVerificationCode_WhenAlreadyClean_PreservesExactValue()
+    {
+        // Arrange
+        var request = new ResendVerificationCodeRequest
+        {
+            Email = "user@example.com"
+        };
+
+        // Act
+        var command = _mapper.ToResendVerificationCode(request);
+
+        // Assert
+        await Assert.That(command.Email).IsEqualTo("user@example.com");
+    }
+
+    #endregion
 }

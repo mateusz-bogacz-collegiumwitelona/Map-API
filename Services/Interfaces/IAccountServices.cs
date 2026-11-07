@@ -11,5 +11,6 @@ namespace Services.Interfaces
         Task<Result> DeleteAccountAsync(Guid userId);
         Task<Result> RegisterAsync(RegisterCommand command, CancellationToken ct = default);
         Task<Result> ConfirmRegisterAsync(ConfirmEmailCommand command, CancellationToken ct = default);
+        Task<Result> ResendEmailVerificationCodeAsync(ResendVerificationCodeCommand command, CancellationToken ct = default);
     }
 }

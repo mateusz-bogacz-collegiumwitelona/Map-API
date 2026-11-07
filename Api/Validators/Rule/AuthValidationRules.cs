@@ -19,13 +19,14 @@ namespace Api.Validators.Rule
             => ruleBuilder
                 .NotEmpty().WithErrorCode(ErrorCodes.ValidationError);
 
-        public static IRuleBuilderOptions<T, string> ApplyCodeRules<T>(this IRuleBuilder<T, string> ruleBuilder)
-            => ruleBuilder
-                .NotEmpty()
-                    .WithErrorCode(ErrorCodes.CodeInvalid)
-                .Length(VerificationConst.CodeLength)
-                    .WithErrorCode(ErrorCodes.CodeInvalid)
-                .Must(x => x.All(char.IsAsciiDigit))
-                    .WithErrorCode(ErrorCodes.CodeInvalid);
+        public static IRuleBuilderOptions<T, string> ApplyCodeRules<T>(this IRuleBuilderInitial<T, string> ruleBuilder)
+             => ruleBuilder
+                 .Cascade(CascadeMode.Stop)
+                 .NotEmpty()
+                     .WithErrorCode(ErrorCodes.CodeInvalid)
+                 .Length(VerificationConst.CodeLength)
+                     .WithErrorCode(ErrorCodes.CodeInvalid)
+                 .Must(code => !string.IsNullOrEmpty(code) && code.All(char.IsAsciiDigit))
+                     .WithErrorCode(ErrorCodes.CodeInvalid);
     }
 }

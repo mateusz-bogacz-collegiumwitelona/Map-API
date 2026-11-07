@@ -3,7 +3,7 @@ using Api.Validators.Validators.Account;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators.Auth
+namespace Tests.Validators.Account
 {
     public class RegisterValidatorTest
     {
@@ -163,7 +163,7 @@ namespace Tests.Validators.Auth
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Email)
-                  .WithErrorCode(ErrorCodes.ValidationError);
+                  .WithErrorCode(ErrorCodes.EmailInvalid);
         }
 
         #endregion

@@ -145,14 +145,20 @@ namespace Tests.Services
         [After(Test)]
         public async Task CleanupAsync()
         {
-            _scope.Dispose();
-            await _serviceProvider.DisposeAsync();
+            _scope?.Dispose();
+            if (_serviceProvider != null)
+            {
+                await _serviceProvider.DisposeAsync();
+            }
 
-            using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"DROP SCHEMA IF EXISTS {_currentSchema} CASCADE;";
-            await cmd.ExecuteNonQueryAsync();
+            if (!string.IsNullOrEmpty(_currentSchema))
+            {
+                using var conn = new NpgsqlConnection(_connectionString);
+                await conn.OpenAsync();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = $"DROP SCHEMA IF EXISTS {_currentSchema} CASCADE;";
+                await cmd.ExecuteNonQueryAsync();
+            }
         }
 
         #endregion
@@ -858,7 +864,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            await Assert.That(result.Message).IsEqualTo("If the email is valid, a verification code has been generated.");
+            await Assert.That(result.Message).IsEqualTo("If the email is valid, a verification code has been sent.");
 
             Context.ChangeTracker.Clear();
 
@@ -1323,6 +1329,237 @@ namespace Tests.Services
             {
                 await Sut.ConfirmRegisterAsync(command, cts.Token);
             }).Throws<OperationCanceledException>();
+        }
+
+        #endregion
+
+        #region ResendEmailVerificationCodeAsync Tests
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenUserIsUnverified_MarksOldCodesAsUsedAndSendsNewVerificationEmail()
+        {
+            // Arrange
+            var user = await CreateUserAsync("unverified@example.com", emailConfirmed: false);
+
+            var previousActiveCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Purpose = VerificationPurposeEnum.Registration,
+                Code = "111111",
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(previousActiveCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ResendVerificationCodeCommand { Email = user.Email! };
+
+            // Act
+            var result = await Sut.ResendEmailVerificationCodeAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("If the email is valid and unverified, a new verification code has been sent.");
+
+            Context.ChangeTracker.Clear();
+
+            var oldCodeInDb = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == previousActiveCode.Id);
+            await Assert.That(oldCodeInDb.IsUsed).IsTrue();
+
+            var newCodeInDb = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleOrDefaultAsync(c => c.UserId == user.Id && c.Purpose == VerificationPurposeEnum.Registration && !c.IsUsed);
+
+            await Assert.That(newCodeInDb).IsNotNull();
+            await Assert.That(newCodeInDb!.Id).IsNotEqualTo(previousActiveCode.Id);
+            await Assert.That(newCodeInDb.Code.Length).IsEqualTo(VerificationConst.CodeLength);
+            await Assert.That(int.TryParse(newCodeInDb.Code, out _)).IsTrue();
+            await Assert.That(newCodeInDb.AttemptsCount).IsEqualTo(0);
+            await Assert.That(newCodeInDb.ExpiredAt).IsGreaterThan(DateTime.UtcNow);
+
+            var sentEmail = _emailService.SentEmails
+                .SingleOrDefault(e => e.Type == FakeEmailService.RegistrationVerificationCodeType && e.To == user.Email);
+
+            await Assert.That(sentEmail).IsNotNull();
+            await Assert.That(sentEmail!.Code).IsEqualTo(newCodeInDb.Code);
+        }
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenMultipleActiveCodesExist_MarksAllPreviousAsUsed()
+        {
+            // Arrange
+            var user = await CreateUserAsync("multi-codes@example.com", emailConfirmed: false);
+
+            var firstCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Purpose = VerificationPurposeEnum.Registration,
+                Code = "111111",
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            var secondCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Purpose = VerificationPurposeEnum.Registration,
+                Code = "222222",
+                ExpiredAt = DateTime.UtcNow.AddHours(2),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddRangeAsync(firstCode, secondCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ResendVerificationCodeCommand { Email = user.Email! };
+
+            // Act
+            var result = await Sut.ResendEmailVerificationCodeAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            Context.ChangeTracker.Clear();
+
+            var activeCodes = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .Where(c => c.UserId == user.Id && c.Purpose == VerificationPurposeEnum.Registration && !c.IsUsed)
+                .ToListAsync();
+
+            await Assert.That(activeCodes.Count).IsEqualTo(1);
+            await Assert.That(activeCodes[0].Code).IsNotEqualTo("111111");
+            await Assert.That(activeCodes[0].Code).IsNotEqualTo("222222");
+        }
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenUserHasEmailChangeCode_DoesNotInvalidateEmailChangeCode()
+        {
+            // Arrange
+            var user = await CreateUserAsync("mixed-purposes@example.com", emailConfirmed: false);
+
+            var emailChangeCode = new EmailVerificationCode
+            {
+                UserId = user.Id,
+                Purpose = VerificationPurposeEnum.EmailChange,
+                NewEmail = "different@example.com",
+                Code = "999999",
+                ExpiredAt = DateTime.UtcNow.AddHours(1),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await Context.EmailVerificationCodes.AddAsync(emailChangeCode);
+            await Context.SaveChangesAsync();
+
+            var command = new ResendVerificationCodeCommand { Email = user.Email! };
+
+            // Act
+            var result = await Sut.ResendEmailVerificationCodeAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            Context.ChangeTracker.Clear();
+
+            var storedEmailChangeCode = await Context.EmailVerificationCodes
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == emailChangeCode.Id);
+
+            await Assert.That(storedEmailChangeCode.IsUsed).IsFalse();
+        }
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenEmailDoesNotExist_ReturnsAntiEnumerationSuccessWithoutSendingEmail()
+        {
+            // Arrange
+            var initialCodesCount = await Context.EmailVerificationCodes.CountAsync();
+            var initialEmailsCount = _emailService.SentEmails.Count;
+
+            var command = new ResendVerificationCodeCommand { Email = "nonexistent@example.com" };
+
+            // Act
+            var result = await Sut.ResendEmailVerificationCodeAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("If the email is valid and unverified, a new verification code has been sent.");
+
+            Context.ChangeTracker.Clear();
+
+            await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodesCount);
+            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(initialEmailsCount);
+        }
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenEmailAlreadyConfirmed_ReturnsAntiEnumerationSuccessWithoutSendingEmail()
+        {
+            // Arrange
+            var user = await CreateUserAsync("confirmed@example.com", emailConfirmed: true);
+            var initialCodesCount = await Context.EmailVerificationCodes.CountAsync();
+            var initialEmailsCount = _emailService.SentEmails.Count;
+
+            var command = new ResendVerificationCodeCommand { Email = user.Email! };
+
+            // Act
+            var result = await Sut.ResendEmailVerificationCodeAsync(command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("If the email is valid and unverified, a new verification code has been sent.");
+
+            Context.ChangeTracker.Clear();
+
+            await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodesCount);
+            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(initialEmailsCount);
+        }
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenEmailCannotBeSent_ThrowsException()
+        {
+            // Arrange
+            var user = await CreateUserAsync("smtp-fail@example.com", emailConfirmed: false);
+            var command = new ResendVerificationCodeCommand { Email = user.Email! };
+
+            _emailService.ThrowOnSend = true;
+
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await Sut.ResendEmailVerificationCodeAsync(command);
+            }).Throws<InvalidOperationException>();
+        }
+
+        [Test]
+        public async Task ResendEmailVerificationCodeAsync_WhenTokenIsAlreadyCancelled_ThrowsOperationCanceledExceptionWithoutPersistingData()
+        {
+            // Arrange
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var user = await CreateUserAsync("cancelled@example.com", emailConfirmed: false);
+            var initialCodesCount = await Context.EmailVerificationCodes.CountAsync();
+
+            var command = new ResendVerificationCodeCommand { Email = user.Email! };
+
+            // Act & Assert
+            await Assert.That(async () =>
+            {
+                await Sut.ResendEmailVerificationCodeAsync(command, cts.Token);
+            }).Throws<OperationCanceledException>();
+
+            Context.ChangeTracker.Clear();
+
+            await Assert.That(await Context.EmailVerificationCodes.CountAsync()).IsEqualTo(initialCodesCount);
+            await Assert.That(_emailService.SentEmails.Count).IsEqualTo(0);
         }
 
         #endregion

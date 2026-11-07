@@ -13,7 +13,7 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.AccountLocked).IsEqualTo("AUTH_004");
             await Assert.That(ErrorCodes.AccountBanned).IsEqualTo("AUTH_005");
 
-            await Assert.That(ErrorCodes.ValidationError).IsEqualTo("VALIDATION_001");
+            await Assert.That(ErrorCodes.ValidationError).IsEqualTo("VAL_001");
 
             await Assert.That(ErrorCodes.InvalidOperation).IsEqualTo("COMMON_001");
             await Assert.That(ErrorCodes.NotFound).IsEqualTo("COMMON_002");

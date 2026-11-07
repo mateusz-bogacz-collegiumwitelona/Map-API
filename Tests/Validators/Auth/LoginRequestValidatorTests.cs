@@ -128,9 +128,15 @@ public class LoginRequestValidatorTests
         // Assert
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Count).IsEqualTo(3);
-        await Assert.That(result.Errors.Count(error => error.PropertyName == nameof(LoginRequest.Email))).IsEqualTo(2);
-        await Assert.That(result.Errors.Count(error => error.PropertyName == nameof(LoginRequest.Password))).IsEqualTo(1);
-        await Assert.That(result.Errors.All(error => error.ErrorCode == ErrorCodes.ValidationError)).IsTrue();
+
+        var emailErrors = result.Errors.Where(e => e.PropertyName == nameof(LoginRequest.Email)).ToList();
+        var passwordErrors = result.Errors.Where(e => e.PropertyName == nameof(LoginRequest.Password)).ToList();
+
+        await Assert.That(emailErrors.Count).IsEqualTo(2);
+        await Assert.That(emailErrors.All(e => e.ErrorCode == ErrorCodes.EmailInvalid)).IsTrue();
+
+        await Assert.That(passwordErrors.Count).IsEqualTo(1);
+        await Assert.That(passwordErrors.All(e => e.ErrorCode == ErrorCodes.ValidationError)).IsTrue();
     }
 
     private static async Task AssertEmailValidationErrors(ValidationResult result, int expectedCount)
@@ -138,7 +144,7 @@ public class LoginRequestValidatorTests
         await Assert.That(result.IsValid).IsFalse();
         await Assert.That(result.Errors.Count).IsEqualTo(expectedCount);
         await Assert.That(result.Errors.All(error => error.PropertyName == nameof(LoginRequest.Email))).IsTrue();
-        await Assert.That(result.Errors.All(error => error.ErrorCode == ErrorCodes.ValidationError)).IsTrue();
+        await Assert.That(result.Errors.All(error => error.ErrorCode == ErrorCodes.EmailInvalid)).IsTrue();
     }
 
     private static async Task AssertSingleValidationError(ValidationResult result, string propertyName)

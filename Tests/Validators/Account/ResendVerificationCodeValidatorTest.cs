@@ -1,22 +1,22 @@
-using Api.Request.Account;
+﻿using Api.Request.Account;
 using Api.Validators.Validators.Account;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators
+namespace Tests.Validators.Account
 {
-    public class ChangeEmailRequestValidatorTest
+    public class ResendVerificationCodeValidatorTest
     {
-        private readonly ChangeEmailRequestValidator _validator = new();
+        private readonly ResendVerificationCodeValidator _validator = new();
 
         [Test]
-        [Arguments("new@example.com")]
-        [Arguments("  new@example.com  ")]
-        [Arguments("first.last+tag@sub.example.pl")]
+        [Arguments("user@example.com")]
+        [Arguments("test.user+tag@domain.co.uk")]
+        [Arguments("first.last@sub.domain.org")]
         public async Task Validate_WhenEmailIsValid_ShouldNotHaveAnyValidationErrors(string email)
         {
             // Arrange
-            var request = new ChangeEmailRequest { NewEmail = email };
+            var request = new ResendVerificationCodeRequest { Email = email };
 
             // Act
             var result = await _validator.TestValidateAsync(request);
@@ -28,20 +28,20 @@ namespace Tests.Validators
         [Test]
         [Arguments("")]
         [Arguments("   ")]
-        [Arguments("not-an-email")]
-        [Arguments("missing-domain@")]
-        [Arguments("@missing-local.com")]
-        [Arguments("two@@example.com")]
+        [Arguments("invalid-email")]
+        [Arguments("@missingusername.com")]
+        [Arguments("missingdomain@")]
+        [Arguments("plainaddress")]
         public async Task Validate_WhenEmailIsInvalid_ShouldHaveEmailInvalidError(string email)
         {
             // Arrange
-            var request = new ChangeEmailRequest { NewEmail = email };
+            var request = new ResendVerificationCodeRequest { Email = email };
 
             // Act
             var result = await _validator.TestValidateAsync(request);
 
             // Assert
-            result.ShouldHaveValidationErrorFor(x => x.NewEmail)
+            result.ShouldHaveValidationErrorFor(x => x.Email)
                 .WithErrorCode(ErrorCodes.EmailInvalid);
             await Assert.That(result.IsValid).IsFalse();
         }
@@ -50,28 +50,29 @@ namespace Tests.Validators
         public async Task Validate_WhenEmailIsNull_ShouldHaveEmailInvalidError()
         {
             // Arrange
-            var request = new ChangeEmailRequest { NewEmail = null! };
+            var request = new ResendVerificationCodeRequest { Email = null! };
 
             // Act
             var result = await _validator.TestValidateAsync(request);
 
             // Assert
-            result.ShouldHaveValidationErrorFor(x => x.NewEmail)
+            result.ShouldHaveValidationErrorFor(x => x.Email)
                 .WithErrorCode(ErrorCodes.EmailInvalid);
             await Assert.That(result.IsValid).IsFalse();
         }
 
         [Test]
-        public async Task Validate_WhenEmailIsLongerThan256Characters_ShouldHaveEmailInvalidError()
+        public async Task Validate_WhenEmailExceedsMaximumLength_ShouldHaveEmailInvalidError()
         {
             // Arrange
-            var request = new ChangeEmailRequest { NewEmail = new string('a', 250) + "@example.com" };
+            var longEmail = new string('a', 245) + "@example.com"; // 257 znaków (> 256)
+            var request = new ResendVerificationCodeRequest { Email = longEmail };
 
             // Act
             var result = await _validator.TestValidateAsync(request);
 
             // Assert
-            result.ShouldHaveValidationErrorFor(x => x.NewEmail)
+            result.ShouldHaveValidationErrorFor(x => x.Email)
                 .WithErrorCode(ErrorCodes.EmailInvalid);
             await Assert.That(result.IsValid).IsFalse();
         }

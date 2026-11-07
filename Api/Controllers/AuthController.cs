@@ -96,5 +96,21 @@ namespace Api.Controllers
             var result = await account.ConfirmRegisterAsync(mapper.ToConfirmEmail(request));
             return HandleResult(result);
         }
+
+        [HttpPost("confirm-email/resend")]
+        [AllowAnonymous]
+        [EndpointSummary("Resend email confirmation code")]
+        [EndpointDescription("Resends the email confirmation code to the user's email address. " +
+            "The endpoint returns 200 on success, 400 if the email is not associated with any account, and 422 if the request data is invalid.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ResendEmailVerificationCodeAsync(
+            [FromServices] IAccountServices account,
+            [FromServices] AuthMapper mapper,
+            [FromBody] ResendVerificationCodeRequest request)
+        {
+            var result = await account.ResendEmailVerificationCodeAsync(mapper.ToResendVerificationCode(request));
+            return HandleResult(result);
+        }
+
     }
 }

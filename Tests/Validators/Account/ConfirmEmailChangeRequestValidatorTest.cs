@@ -3,7 +3,7 @@ using Api.Validators.Validators.Account;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators
+namespace Tests.Validators.Account
 {
     public class ConfirmEmailChangeRequestValidatorTest
     {

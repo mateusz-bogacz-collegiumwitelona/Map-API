@@ -11,11 +11,10 @@
         public const string InvalidRefreshToken = "AUTH_003";
         public const string AccountLocked = "AUTH_004";
         public const string AccountBanned = "AUTH_005";
-        public const string InvalidVerificationCode = "AUTH_006";
         #endregion
 
         #region Validation
-        public const string ValidationError = "VALIDATION_001";
+        public const string ValidationError = "VAL_001";
         #endregion
 
         #region Common
