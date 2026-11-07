@@ -1,9 +1,9 @@
-﻿using Api.Request.Auth;
+﻿using Api.Request.Account;
 using Api.Validators.Rule;
 using Domain.Const;
 using FluentValidation;
 
-namespace Api.Validators.Validators.Auth
+namespace Api.Validators.Validators.Account
 {
     public class RegisterValidator : AbstractValidator<RegisterRequest>
     {

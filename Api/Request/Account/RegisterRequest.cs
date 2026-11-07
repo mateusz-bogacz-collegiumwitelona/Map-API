@@ -1,4 +1,4 @@
-﻿namespace Api.Request.Auth
+﻿namespace Api.Request.Account
 {
     public sealed record RegisterRequest
     {

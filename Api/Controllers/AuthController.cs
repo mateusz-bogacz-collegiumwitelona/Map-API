@@ -1,6 +1,7 @@
 using Api.Configuration;
 using Api.Controllers.Base;
 using Api.Mappers;
+using Api.Request.Account;
 using Api.Request.Auth;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;

@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Services.Accessors.Interfaces;
+using Services.Command.Account;
 using Services.Command.Auth;
-using Services.Command.User;
 using Services.Interfaces;
 using Services.Interfaces.Auth;
 using System.Security.Cryptography;
@@ -331,7 +331,7 @@ namespace Services.Services
                 throw new InternalServerException($"Failed to assign default role: {errors}");
             }
 
-            var rawCode = RandomNumberGenerator.GetInt32(100_000, 1_000_000).ToString("D6");
+            var rawCode = RandomNumberGenerator.GetString("0123456789", VerificationConst.CodeLength);
             const int expirationHours = 4;
 
             var codeEntity = new EmailVerificationCode

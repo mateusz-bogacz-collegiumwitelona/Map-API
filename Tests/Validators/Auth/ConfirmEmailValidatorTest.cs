@@ -1,5 +1,5 @@
-﻿using Api.Request.Auth;
-using Api.Validators.Validators.Auth;
+﻿using Api.Request.Account;
+using Api.Validators.Validators.Account;
 using Domain.Const;
 using FluentValidation.TestHelper;
 

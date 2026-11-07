@@ -1,4 +1,5 @@
 using Api.Mappers;
+using Api.Request.Account;
 using Api.Request.Auth;
 
 namespace Tests.Mappers;

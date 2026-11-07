@@ -1,4 +1,5 @@
 using Api.Mappers.Helper;
+using Api.Request.Account;
 using Api.Request.Auth;
 using Riok.Mapperly.Abstractions;
 using Services.Command.Auth;
