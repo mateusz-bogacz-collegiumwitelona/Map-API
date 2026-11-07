@@ -91,7 +91,7 @@ services:
     container_name: map-api-mailpit
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
-      - "${MAILPIT_SEND_PORT:-63854}:1025"
+      - "${SMTP_PORT:-63854}:1025"
     restart: unless-stopped
     networks:
       - dev
