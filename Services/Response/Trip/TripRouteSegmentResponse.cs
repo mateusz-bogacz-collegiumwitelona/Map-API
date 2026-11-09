@@ -14,6 +14,6 @@ namespace Services.Response.Trip
         public required bool IsFallbackRoute { get; init; }
         public required string OriginName { get; init; }
         public required string DestinationName { get; init; }
-        public required double[][] Coordinates { get; init; }
+        public required List<GeoCoordinate> Coordinates { get; init; }
     }
 }

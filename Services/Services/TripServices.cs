@@ -80,10 +80,10 @@ namespace Services.Services
                 statusCode: StatusCodes.Status200OK);
         }
 
-        private static double[][] ToCoordinates(Geometry geometry)
+        private static List<GeoCoordinate> ToCoordinates(Geometry geometry)
             => DouglasPeuckerSimplifier.Simplify(geometry, GeoConst.RouteSimplificationToleranceDegrees)
                 .Coordinates
-                .Select(c => new[] { c.X, c.Y })
-                .ToArray();
+                .Select(c => new GeoCoordinate { Latitude = c.Y, Longitude = c.X })
+                .ToList();
     }
 }

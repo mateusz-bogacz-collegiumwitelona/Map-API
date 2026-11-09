@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using Npgsql;
 using Services.Interfaces;
+using Services.Response.Trip;
 using Services.Services;
 using System.Text.Json;
 using Testcontainers.PostgreSql;
@@ -195,6 +196,9 @@ namespace Tests.Services
 
         private static DateTime Utc(int year, int month, int day, int hour = 0, int minute = 0)
             => new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Utc);
+
+        private static GeoCoordinate Point(double latitude, double longitude)
+            => new GeoCoordinate { Latitude = latitude, Longitude = longitude };
         #endregion
 
         #region Response content
@@ -229,7 +233,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task GetTripRoutesAsync_ShouldReturnCoordinatesAsLongitudeLatitudeInRouteOrder()
+        public async Task GetTripRoutesAsync_ShouldReturnCoordinatesWithLatitudeAndLongitudeInRouteOrder()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -241,10 +245,10 @@ namespace Tests.Services
 
             // Assert
             var coordinates = result.Data![0].Segments[0].Coordinates;
-            await Assert.That(coordinates.Length).IsEqualTo(3);
-            await Assert.That(coordinates[0].SequenceEqual(new[] { 19.94, 50.06 })).IsTrue();
-            await Assert.That(coordinates[1].SequenceEqual(new[] { 16.00, 46.00 })).IsTrue();
-            await Assert.That(coordinates[2].SequenceEqual(new[] { 12.49, 41.90 })).IsTrue();
+            await Assert.That(coordinates.Count).IsEqualTo(3);
+            await Assert.That(coordinates[0]).IsEqualTo(Point(50.06, 19.94));
+            await Assert.That(coordinates[1]).IsEqualTo(Point(46.00, 16.00));
+            await Assert.That(coordinates[2]).IsEqualTo(Point(41.90, 12.49));
         }
 
         [Test]
@@ -267,11 +271,11 @@ namespace Tests.Services
 
             // Assert
             var coordinates = result.Data![0].Segments[0].Coordinates;
-            await Assert.That(coordinates.Length).IsEqualTo(4);
-            await Assert.That(coordinates[0].SequenceEqual(new[] { 10.0000, 50.0000 })).IsTrue();
-            await Assert.That(coordinates[1].SequenceEqual(new[] { 10.2000, 50.0000 })).IsTrue();
-            await Assert.That(coordinates[2].SequenceEqual(new[] { 10.3000, 51.0000 })).IsTrue();
-            await Assert.That(coordinates[3].SequenceEqual(new[] { 10.4000, 50.0000 })).IsTrue();
+            await Assert.That(coordinates.Count).IsEqualTo(4);
+            await Assert.That(coordinates[0]).IsEqualTo(Point(50.0000, 10.0000));
+            await Assert.That(coordinates[1]).IsEqualTo(Point(50.0000, 10.2000));
+            await Assert.That(coordinates[2]).IsEqualTo(Point(51.0000, 10.3000));
+            await Assert.That(coordinates[3]).IsEqualTo(Point(50.0000, 10.4000));
         }
 
         [Test]
@@ -292,9 +296,9 @@ namespace Tests.Services
 
             // Assert
             var coordinates = result.Data![0].Segments[0].Coordinates;
-            await Assert.That(coordinates.Length).IsEqualTo(2);
-            await Assert.That(coordinates[0].SequenceEqual(new[] { 10.0000, 50.0000 })).IsTrue();
-            await Assert.That(coordinates[1].SequenceEqual(new[] { 10.0002, 50.0000 })).IsTrue();
+            await Assert.That(coordinates.Count).IsEqualTo(2);
+            await Assert.That(coordinates[0]).IsEqualTo(Point(50.0000, 10.0000));
+            await Assert.That(coordinates[1]).IsEqualTo(Point(50.0000, 10.0002));
         }
 
         [Test]
@@ -315,9 +319,9 @@ namespace Tests.Services
 
             // Assert
             var coordinates = result.Data![0].Segments[0].Coordinates;
-            await Assert.That(coordinates.Length).IsGreaterThanOrEqualTo(2);
-            await Assert.That(coordinates[0].SequenceEqual(new[] { 10.0000, 50.0000 })).IsTrue();
-            await Assert.That(coordinates[^1].SequenceEqual(new[] { 10.0000, 50.0000 })).IsTrue();
+            await Assert.That(coordinates.Count).IsGreaterThanOrEqualTo(2);
+            await Assert.That(coordinates[0]).IsEqualTo(Point(50.0000, 10.0000));
+            await Assert.That(coordinates[^1]).IsEqualTo(Point(50.0000, 10.0000));
         }
 
         [Test]
@@ -334,7 +338,7 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(json).Contains("\"transportType\":\"Plane\"");
-            await Assert.That(json).Contains("\"coordinates\":[[19.94,50.06],[16,46],[12.49,41.9]]");
+            await Assert.That(json).Contains("\"coordinates\":[{\"latitude\":50.06,\"longitude\":19.94},{\"latitude\":46,\"longitude\":16},{\"latitude\":41.9,\"longitude\":12.49}]");
         }
 
         [Test]
