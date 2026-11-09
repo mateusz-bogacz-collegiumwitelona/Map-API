@@ -159,5 +159,5 @@ public class AuthMapperTests
         await Assert.That(command.Email).IsEqualTo("user@example.com");
     }
 
-    #endregion
+    #endregion 
 }
