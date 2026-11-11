@@ -133,7 +133,6 @@ public class AuthServiceCancellationTests
         tokenService: tokenService,
         passwordHasher: new PasswordHasher<User>(),
         ctAccessor: accessor,
-        dbContext: null!,
         logger: NullLogger<AuthService>.Instance);
 
     private sealed class RecordingTokenService : ITokenService

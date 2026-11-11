@@ -1,7 +1,6 @@
 using Domain.Common;
 using Domain.Const;
 using Domain.Models;
-using Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -26,7 +25,6 @@ namespace Services.Services.Auth
             ITokenService tokenService,
             IPasswordHasher<User> passwordHasher,
             ICancellationTokenAccessor ctAccessor,
-            AppDbContext dbContext,
             ILogger<AuthService> logger)
         {
             _userManager = userManager;
@@ -102,7 +100,6 @@ namespace Services.Services.Auth
 
             if (consumedToken is null || consumedToken.User is null)
             {
-                _logger.LogWarning("Refresh token attempt failed. Invalid or expired refresh token: {RefreshToken}", refreshToken);
                 return InvalidRefreshToken();
             }
 
@@ -133,7 +130,6 @@ namespace Services.Services.Auth
 
             await _tokenService.RevokeRefreshTokenAsync(refreshToken, token);
 
-            _logger.LogInformation("Refresh token revoked successfully: {RefreshToken}", refreshToken);
             return Result.Success(
                 message: "Logged out successfully.",
                 statusCode: StatusCodes.Status200OK);

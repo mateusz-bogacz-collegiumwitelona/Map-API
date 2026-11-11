@@ -20,7 +20,7 @@ namespace Api.Mappers
                 LastName = NormalizeRequiredName(request.LastName),
                 Email = request.Email.Trim(),
                 Password = request.Password,
-                Bio = request.Bio,
+                Bio = request.Bio?.Trim(),
                 IsPublic = request.IsPublic
             };
 

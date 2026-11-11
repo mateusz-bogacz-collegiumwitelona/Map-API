@@ -245,7 +245,7 @@ namespace Services.Services
                 _logger.LogWarning("Registration attempt for already registered email: {Email}", command.Email);
                 return Result.Success(
                     message: "If the email is valid, a verification code has been sent.",
-                    statusCode: StatusCodes.Status200OK);
+                    statusCode: StatusCodes.Status201Created);
             }
 
             await using var transaction = await _context.Database.BeginTransactionAsync(token);
@@ -288,8 +288,8 @@ namespace Services.Services
                 cancellationToken: token);
 
             return Result.Success(
-                message: "User registered successfully. Please check your email for the verification code.",
-                statusCode: StatusCodes.Status201Created);
+                 message: "If the email is valid, a verification code has been sent.",
+                 statusCode: StatusCodes.Status201Created);
         }
 
         public async Task<Result> ConfirmRegisterAsync(ConfirmEmailCommand command, CancellationToken ct = default)
@@ -334,8 +334,6 @@ namespace Services.Services
 
             if (verificationCode.AttemptsCount >= VerificationConst.MaxAttempts)
             {
-                verificationCode.IsUsed = true;
-                await _context.SaveChangesAsync(token);
 
                 _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Maximum attempts reached.", command.Email);
                 return Result.Failure(
@@ -359,11 +357,6 @@ namespace Services.Services
             if (!CodesMatch(verificationCode.Code, command.Code))
             {
                 verificationCode.AttemptsCount++;
-
-                if (verificationCode.AttemptsCount >= 5)
-                {
-                    verificationCode.IsUsed = true;
-                }
 
                 await _context.SaveChangesAsync(token);
 

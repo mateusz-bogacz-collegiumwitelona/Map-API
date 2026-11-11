@@ -69,14 +69,15 @@ namespace Api.Controllers
         [HttpPost("register")]
         [AllowAnonymous]
         [EndpointSummary("Register a new user account")]
-        [EndpointDescription("Creates a new user account with the supplied email, password, and optional first and last names. " +
-            "The account is created in an unconfirmed state and an email confirmation link is sent to the provided email address. " +
-            "The endpoint returns 200 on success, 400 if the email is already in use, and 422 if the request data is invalid.")]
-        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [EndpointDescription("Creates a new user account with the supplied email, password, and user details. " +
+                    "The account is created in an unconfirmed state and an email verification code is sent to the provided email address. " +
+                    "The endpoint always returns 201 on valid input (without revealing whether the email is already registered) and 400 if validation fails.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RegisterAsync(
-            [FromServices] IAccountServices account,
-            [FromServices] AuthMapper mapper,
-            [FromBody] RegisterRequest request)
+                    [FromServices] IAccountServices account,
+                    [FromServices] AuthMapper mapper,
+                    [FromBody] RegisterRequest request)
         {
             var result = await account.RegisterAsync(mapper.ToRegisterCommand(request));
             return HandleResult(result);
@@ -85,13 +86,15 @@ namespace Api.Controllers
         [HttpPost("confirm-email")]
         [AllowAnonymous]
         [EndpointSummary("Confirm a user's email address")]
-        [EndpointDescription("Validates the supplied email confirmation code and marks the user's email address as confirmed. " +
-            "The endpoint returns 200 on success, 400 if the code is invalid or expired, and 422 if the request data is invalid.")]
+        [EndpointDescription("Validates the supplied email verification code and marks the user's email address as confirmed. " +
+                    "The endpoint returns 200 on success, 400 if the request data or code is invalid/expired, and 429 if maximum verification attempts are exceeded.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status429TooManyRequests)]
         public async Task<IActionResult> ConfirmRegisterAsync(
-            [FromServices] IAccountServices account,
-            [FromServices] AuthMapper mapper,
-            [FromBody] ConfirmEmailRequest request)
+                    [FromServices] IAccountServices account,
+                    [FromServices] AuthMapper mapper,
+                    [FromBody] ConfirmEmailRequest request)
         {
             var result = await account.ConfirmRegisterAsync(mapper.ToConfirmEmail(request));
             return HandleResult(result);
@@ -99,18 +102,20 @@ namespace Api.Controllers
 
         [HttpPost("confirm-email/resend")]
         [AllowAnonymous]
-        [EndpointSummary("Resend email confirmation code")]
-        [EndpointDescription("Resends the email confirmation code to the user's email address. " +
-            "The endpoint returns 200 on success, 400 if the email is not associated with any account, and 422 if the request data is invalid.")]
+        [EnableRateLimiting(RateLimitingConfiguration.EmailResendPolicy)]
+        [EndpointSummary("Resend email verification code")]
+        [EndpointDescription("Resends the email verification code to the user's email address if the account exists and is unverified. " +
+             "The endpoint returns a generic 200 response on valid input, 400 if validation fails, and 429 if the resend rate limit is exceeded.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status429TooManyRequests)]
         public async Task<IActionResult> ResendEmailVerificationCodeAsync(
-            [FromServices] IAccountServices account,
-            [FromServices] AuthMapper mapper,
-            [FromBody] ResendVerificationCodeRequest request)
+             [FromServices] IAccountServices account,
+             [FromServices] AuthMapper mapper,
+             [FromBody] ResendVerificationCodeRequest request)
         {
             var result = await account.ResendEmailVerificationCodeAsync(mapper.ToResendVerificationCode(request));
             return HandleResult(result);
         }
-
     }
 }

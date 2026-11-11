@@ -13,7 +13,8 @@ namespace Api.Validators.Rule
 
         public static IRuleBuilderOptions<T, string> ApplyPasswordRules<T>(this IRuleBuilder<T, string> ruleBuilder)
             => ruleBuilder
-                .NotEmpty().WithErrorCode(ErrorCodes.ValidationError);
+                .NotEmpty()
+                .WithErrorCode(ErrorCodes.ValidationError);
 
         public static IRuleBuilderOptions<T, string> ApplyRefreshTokenRules<T>(this IRuleBuilder<T, string> ruleBuilder)
             => ruleBuilder

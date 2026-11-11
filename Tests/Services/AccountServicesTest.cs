@@ -778,7 +778,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status201Created);
-            await Assert.That(result.Message).IsEqualTo("User registered successfully. Please check your email for the verification code.");
+            await Assert.That(result.Message).IsEqualTo("If the email is valid, a verification code has been sent.");
 
             Context.ChangeTracker.Clear();
 
@@ -863,7 +863,7 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status201Created);
             await Assert.That(result.Message).IsEqualTo("If the email is valid, a verification code has been sent.");
 
             Context.ChangeTracker.Clear();
@@ -1209,7 +1209,7 @@ namespace Tests.Services
                 .SingleAsync(c => c.Id == verificationCode.Id);
 
             await Assert.That(storedCode.AttemptsCount).IsEqualTo(5);
-            await Assert.That(storedCode.IsUsed).IsTrue();
+            await Assert.That(storedCode.IsUsed).IsFalse();
         }
 
         [Test]
@@ -1251,7 +1251,7 @@ namespace Tests.Services
                 .AsNoTracking()
                 .SingleAsync(c => c.Id == verificationCode.Id);
 
-            await Assert.That(storedCode.IsUsed).IsTrue();
+            await Assert.That(storedCode.IsUsed).IsFalse();
         }
 
         [Test]

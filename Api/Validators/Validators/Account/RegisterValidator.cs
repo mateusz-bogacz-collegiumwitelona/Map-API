@@ -15,7 +15,7 @@ namespace Api.Validators.Validators.Account
 
             RuleFor(x => x.Email).ApplyEmailRules();
 
-            RuleFor(x => x.Password).ApplyPasswordRules();
+            RuleFor(x => x.Password).ApplyStrongPasswordRules();
 
             RuleFor(x => x.ConfirmPassword)
                 .NotEmpty().WithErrorCode(ErrorCodes.ValidationError)
