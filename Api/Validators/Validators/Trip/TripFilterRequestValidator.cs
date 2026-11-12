@@ -1,4 +1,5 @@
 using Api.Request.Trip;
+using Api.Validators.Rule;
 using Domain.Const;
 using FluentValidation;
 
@@ -9,8 +10,7 @@ namespace Api.Validators.Validators.Trip
         public TripFilterRequestValidator()
         {
             RuleFor(x => x.UserId)
-                .NotEqual(Guid.Empty)
-                    .WithErrorCode(ErrorCodes.UserIdInvalid);
+                .ApplyGuidRules();
 
             RuleFor(x => x.Year)
                 .Must(year => year >= TripConst.MinFilterYear && year <= MaxFilterYear())

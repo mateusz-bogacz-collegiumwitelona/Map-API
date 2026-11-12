@@ -20,13 +20,12 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.BadRequest).IsEqualTo("COMMON_003");
             await Assert.That(ErrorCodes.InternalError).IsEqualTo("COMMON_004");
             await Assert.That(ErrorCodes.TooManyRequests).IsEqualTo("COMMON_005");
+            await Assert.That(ErrorCodes.GuidInvalid).IsEqualTo("COMMON_006");
             await Assert.That(ErrorCodes.AccessDenied).IsEqualTo("ACCESS_DENIED");
 
             await Assert.That(ErrorCodes.FirstNameInvalid).IsEqualTo("USR_001");
             await Assert.That(ErrorCodes.LastNameInvalid).IsEqualTo("USR_002");
             await Assert.That(ErrorCodes.BioInvalid).IsEqualTo("USR_003");
-            await Assert.That(ErrorCodes.UserIdInvalid).IsEqualTo("USR_008");
-
             await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
         }
 
@@ -46,11 +45,11 @@ namespace Tests.Other
                 ErrorCodes.BadRequest,
                 ErrorCodes.InternalError,
                 ErrorCodes.TooManyRequests,
+                ErrorCodes.GuidInvalid,
                 ErrorCodes.AccessDenied,
                 ErrorCodes.FirstNameInvalid,
                 ErrorCodes.LastNameInvalid,
                 ErrorCodes.BioInvalid,
-                ErrorCodes.UserIdInvalid,
                 ErrorCodes.YearInvalid
             };
 

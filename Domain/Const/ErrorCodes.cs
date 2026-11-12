@@ -23,6 +23,7 @@
         public const string BadRequest = "COMMON_003";
         public const string InternalError = "COMMON_004";
         public const string TooManyRequests = "COMMON_005";
+        public const string GuidInvalid = "COMMON_006";
         public const string AccessDenied = "ACCESS_DENIED";
         #endregion
 
@@ -34,7 +35,6 @@
         public const string EmailTaken = "USR_005";
         public const string EmailUnchanged = "USR_006";
         public const string EmailAlreadyExist = "USR_007";
-        public const string UserIdInvalid = "USR_008";
         #endregion
 
         #region Verification

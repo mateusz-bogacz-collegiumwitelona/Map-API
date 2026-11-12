@@ -46,7 +46,7 @@ namespace Tests.Validators.Trip
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.UserId)
-                  .WithErrorCode(ErrorCodes.UserIdInvalid);
+                  .WithErrorCode(ErrorCodes.GuidInvalid);
         }
 
         [Test]
