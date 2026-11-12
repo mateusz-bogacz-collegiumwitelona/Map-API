@@ -32,7 +32,6 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(Result<PagedResult<TripSummaryResponse>>), StatusCodes.Status200OK)]
         [HttpGet]
         [Authorize]
-
         public async Task<IActionResult> GetUserTripsAsync(
             [FromServices] ITripServices trips,
             [FromServices] ListMapper mapper,
