@@ -108,6 +108,22 @@
             /// Returned when the requested email address is the same as the account's current email address.
             /// </summary>
             public const string EmailUnchanged = "USR_006";
+
+            /// <summary>
+            /// Returned when the supplied user ID is an empty GUID.
+            /// </summary>
+            public const string UserIdInvalid = "USR_007";
+        }
+
+        /// <summary>
+        /// Error codes related to trip queries.
+        /// </summary>
+        public static class Trip
+        {
+            /// <summary>
+            /// Returned when the year filter is outside the supported range.
+            /// </summary>
+            public const string YearInvalid = "TRIP_001";
         }
 
         /// <summary>

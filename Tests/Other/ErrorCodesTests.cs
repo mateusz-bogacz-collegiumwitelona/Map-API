@@ -28,6 +28,9 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.User.EmailInvalid).IsEqualTo("USR_004");
             await Assert.That(ErrorCodes.User.EmailTaken).IsEqualTo("USR_005");
             await Assert.That(ErrorCodes.User.EmailUnchanged).IsEqualTo("USR_006");
+            await Assert.That(ErrorCodes.User.UserIdInvalid).IsEqualTo("USR_007");
+
+            await Assert.That(ErrorCodes.Trip.YearInvalid).IsEqualTo("TRIP_001");
 
             await Assert.That(ErrorCodes.Verification.CodeInvalid).IsEqualTo("VER_001");
             await Assert.That(ErrorCodes.Verification.CodeExpired).IsEqualTo("VER_002");
@@ -57,6 +60,8 @@ namespace Tests.Other
                 ErrorCodes.User.EmailInvalid,
                 ErrorCodes.User.EmailTaken,
                 ErrorCodes.User.EmailUnchanged,
+                ErrorCodes.User.UserIdInvalid,
+                ErrorCodes.Trip.YearInvalid,
                 ErrorCodes.Verification.CodeInvalid,
                 ErrorCodes.Verification.CodeExpired,
                 ErrorCodes.Verification.AttemptsExceeded
