@@ -5,6 +5,7 @@ namespace Tests.Email
 {
     public class EmailServiceTest
     {
+        #region GetSecureSocketOptions
         [Test]
         [Arguments(1025)]
         [Arguments(587)]
@@ -47,6 +48,7 @@ namespace Tests.Email
             // Assert
             await Assert.That(socketOptions).IsEqualTo(SecureSocketOptions.SslOnConnect);
         }
+        #endregion
 
         private static SmtpOptions CreateOptions(int port, string? username)
             => new()

@@ -1,4 +1,4 @@
-namespace Api.Request.User
+namespace Api.Request.Account
 {
     public sealed record ChangeEmailRequest
     {

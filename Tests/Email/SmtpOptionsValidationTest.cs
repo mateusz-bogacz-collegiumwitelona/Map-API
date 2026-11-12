@@ -81,6 +81,32 @@ namespace Tests.Email
             await Assert.That(isValid).IsFalse();
         }
 
+        [Test]
+        [Arguments("", 587, "no-reply@map.local", "Map", false)]
+        [Arguments("smtp.example.com", 0, "no-reply@map.local", "Map", false)]
+        [Arguments("smtp.example.com", 70000, "no-reply@map.local", "Map", false)]
+        [Arguments("smtp.example.com", 587, "invalid-email", "Map", false)]
+        [Arguments("smtp.example.com", 587, "no-reply@map.local", "", false)]
+        [Arguments("smtp.example.com", 587, "no-reply@map.local", "Map", true)]
+        public async Task SmtpOptions_IsValid_ValidatesRequiredFieldsCorrectly(
+            string host, int port, string fromAddress, string fromName, bool expected)
+        {
+            // Arrange
+            var options = new SmtpOptions
+            {
+                Host = host,
+                Port = port,
+                FromAddress = fromAddress,
+                FromName = fromName
+            };
+
+            // Act
+            var isValid = options.IsValid();
+
+            // Assert
+            await Assert.That(isValid).IsEqualTo(expected);
+        }
+
         private static SmtpOptions CreateValidOptions()
             => new()
             {

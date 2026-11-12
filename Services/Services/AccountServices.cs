@@ -1,6 +1,7 @@
 using Domain.Common;
 using Domain.Const;
 using Domain.Enum;
+using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Services.Accessors.Interfaces;
-using Services.Command.User;
+using Services.Command.Account;
+using Services.Command.Auth;
 using Services.Interfaces;
 using Services.Interfaces.Auth;
 using System.Security.Cryptography;
@@ -27,6 +29,7 @@ namespace Services.Services
         private readonly ILookupNormalizer _normalizer;
         private readonly ILogger<AccountServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+        private readonly UserManager<User> _userManager;
 
         private CancellationToken _ct => _ctAccessor.Token;
 
@@ -36,7 +39,8 @@ namespace Services.Services
             IEmailService emailService,
             ILookupNormalizer normalizer,
             ILogger<AccountServices> logger,
-            ICancellationTokenAccessor ctAccessor)
+            ICancellationTokenAccessor ctAccessor,
+            UserManager<User> userManager)
         {
             _context = context;
             _tokenService = tokenService;
@@ -44,6 +48,7 @@ namespace Services.Services
             _normalizer = normalizer;
             _logger = logger;
             _ctAccessor = ctAccessor;
+            _userManager = userManager;
         }
 
         public async Task<Result> RequestEmailChangeAsync(Guid userId, ChangeEmailCommand command)
@@ -62,7 +67,7 @@ namespace Services.Services
             {
                 return Result.Failure(
                     message: "The new email address must be different from the current one.",
-                    errorCode: ErrorCodes.User.EmailUnchanged,
+                    errorCode: ErrorCodes.EmailUnchanged,
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
@@ -117,7 +122,7 @@ namespace Services.Services
             {
                 return Result.Failure(
                     message: "The verification code has expired. Please request a new one.",
-                    errorCode: ErrorCodes.Verification.CodeExpired,
+                    errorCode: ErrorCodes.CodeExpired,
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
@@ -125,7 +130,7 @@ namespace Services.Services
             {
                 return Result.Failure(
                     message: "Too many incorrect attempts. Please request a new verification code.",
-                    errorCode: ErrorCodes.Verification.AttemptsExceeded,
+                    errorCode: ErrorCodes.AttemptsExceeded,
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
@@ -228,6 +233,216 @@ namespace Services.Services
                 statusCode: StatusCodes.Status200OK);
         }
 
+        public async Task<Result> RegisterAsync(RegisterCommand command, CancellationToken ct = default)
+        {
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+            token.ThrowIfCancellationRequested();
+
+            var existingUser = await _userManager.FindByEmailAsync(command.Email) is not null;
+
+            if (existingUser)
+            {
+                _logger.LogWarning("Registration attempt for already registered email: {Email}", command.Email);
+                return Result.Success(
+                    message: "If the email is valid, a verification code has been sent.",
+                    statusCode: StatusCodes.Status201Created);
+            }
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(token);
+
+            var newUser = new User
+            {
+                UserName = command.Email,
+                Email = command.Email,
+                FirstName = command.FirstName,
+                LastName = command.LastName,
+                Bio = string.IsNullOrWhiteSpace(command.Bio) ? null : command.Bio,
+                EmailConfirmed = false,
+                IsPublic = command.IsPublic
+            };
+
+            var createUser = await _userManager.CreateAsync(newUser, command.Password);
+            if (!createUser.Succeeded)
+            {
+                var errors = string.Join(", ", createUser.Errors.Select(e => e.Description));
+                _logger.LogError("User creation failed for email: {Email}. Errors: {Errors}", command.Email, errors);
+                throw new InternalServerException($"Failed to create user: {errors}");
+            }
+
+            var roleAssign = await _userManager.AddToRoleAsync(newUser, "User");
+            if (!roleAssign.Succeeded)
+            {
+                var errors = string.Join(", ", roleAssign.Errors.Select(e => e.Description));
+                _logger.LogCritical("Default role 'User' could not be assigned. Errors: {Errors}", errors);
+                throw new InternalServerException($"Failed to assign default role: {errors}");
+            }
+
+            var rawCode = await CreateRegistrationCodeAsync(newUser.Id, token);
+            await transaction.CommitAsync(token);
+
+            await _emailService.SendRegistrationVerificationCodeAsync(
+                toEmail: newUser.Email!,
+                firstName: newUser.FirstName,
+                code: rawCode,
+                validForMinutes: VerificationConst.CodeExpirationMinutes,
+                cancellationToken: token);
+
+            return Result.Success(
+                 message: "If the email is valid, a verification code has been sent.",
+                 statusCode: StatusCodes.Status201Created);
+        }
+
+        public async Task<Result> ConfirmRegisterAsync(ConfirmEmailCommand command, CancellationToken ct = default)
+        {
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+            token.ThrowIfCancellationRequested();
+
+            var user = await _userManager.FindByEmailAsync(command.Email);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Email confirmation attempt failed for non-existent user with email: {Email}", command.Email);
+                return Result.Failure(
+                    message: "Invalid email or token.",
+                    errorCode: ErrorCodes.InvalidCredentials,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (user.EmailConfirmed)
+            {
+                _logger.LogInformation("Email confirmation attempt for already confirmed email: {Email}", command.Email);
+                return Result.Success(
+                    message: "Email is already confirmed.",
+                    statusCode: StatusCodes.Status200OK
+                    );
+            }
+
+            var verificationCode = await _context.EmailVerificationCodes
+                .Where(c => c.UserId == user.Id && !c.IsUsed)
+                .OrderByDescending(c => c.CreatedAt)
+                .FirstOrDefaultAsync(token);
+
+            if (verificationCode == null)
+            {
+                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. No verification code found.", command.Email);
+                return Result.Failure(
+                    message: "Invalid email or token.",
+                    errorCode: ErrorCodes.InvalidCredentials,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+
+            if (verificationCode.AttemptsCount >= VerificationConst.MaxAttempts)
+            {
+
+                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Maximum attempts reached.", command.Email);
+                return Result.Failure(
+                    message: "Maximum verification attempts reached. Please request a new verification code.",
+                    errorCode: ErrorCodes.AccountLocked,
+                    statusCode: StatusCodes.Status429TooManyRequests);
+            }
+
+            if (verificationCode.ExpiredAt < DateTime.UtcNow)
+            {
+                verificationCode.IsUsed = true;
+                await _context.SaveChangesAsync(token);
+
+                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Verification code expired.", command.Email);
+                return Result.Failure(
+                    message: "Verification code has expired. Please request a new verification code.",
+                    errorCode: ErrorCodes.InvalidCredentials,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (!CodesMatch(verificationCode.Code, command.Code))
+            {
+                verificationCode.AttemptsCount++;
+
+                await _context.SaveChangesAsync(token);
+
+                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Invalid verification code.", command.Email);
+                return Result.Failure(
+                    message: "Invalid verification code.",
+                    errorCode: ErrorCodes.InvalidCredentials,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(token);
+
+            verificationCode.IsUsed = true;
+            user.EmailConfirmed = true;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                _logger.LogError("Failed to update email confirmation status for user ID: {UserId}. Errors: {Errors}", user.Id, errors);
+                throw new InternalServerException($"Failed to confirm user email due to persistence error: {errors}");
+            }
+
+            await _context.SaveChangesAsync(token);
+            await transaction.CommitAsync(token);
+
+            _logger.LogInformation("Email confirmed successfully for user with email: {Email}", command.Email);
+            return Result.Success(
+                message: "Email confirmed successfully.",
+                statusCode: StatusCodes.Status200OK
+                );
+
+        }
+
+        public async Task<Result> ResendEmailVerificationCodeAsync(ResendVerificationCodeCommand command, CancellationToken ct = default)
+        {
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+            token.ThrowIfCancellationRequested();
+
+            const string genericSuccessMessage = "If the email is valid and unverified, a new verification code has been sent.";
+
+            var user = await _userManager.FindByEmailAsync(command.Email);
+
+            if (user is null || user.EmailConfirmed)
+            {
+                if (user is null)
+                {
+                    _logger.LogWarning("Email resend attempt for non-existent email: {Email}", command.Email);
+                }
+                else
+                {
+                    _logger.LogInformation("Email resend attempt for already confirmed email: {Email}", command.Email);
+                }
+
+                return Result.Success(
+                    message: genericSuccessMessage,
+                    statusCode: StatusCodes.Status200OK);
+            }
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(token);
+
+            var activeCodes = await _context.EmailVerificationCodes
+                .Where(c => c.UserId == user.Id && c.Purpose == VerificationPurposeEnum.Registration && !c.IsUsed)
+                .ToListAsync(token);
+
+            foreach (var code in activeCodes)
+            {
+                code.IsUsed = true;
+            }
+
+            var rawCode = await CreateRegistrationCodeAsync(user.Id, token);
+            await transaction.CommitAsync(token);
+
+            await _emailService.SendRegistrationVerificationCodeAsync(
+                toEmail: user.Email!,
+                firstName: user.FirstName,
+                code: rawCode,
+                validForMinutes: VerificationConst.CodeExpirationMinutes,
+                cancellationToken: token);
+
+            return Result.Success(
+                message: genericSuccessMessage,
+                statusCode: StatusCodes.Status200OK);
+        }
+
         private IQueryable<EmailVerificationCode> PendingEmailChangeCodes(Guid userId)
             => _context.EmailVerificationCodes
                 .Where(c => c.UserId == userId && c.Purpose == VerificationPurposeEnum.EmailChange && !c.IsUsed);
@@ -289,19 +504,39 @@ namespace Services.Services
         private static Result UserNotFound(Guid userId)
             => Result.Failure(
                 message: $"User with ID '{userId}' was not found.",
-                errorCode: ErrorCodes.Common.NotFound,
+                errorCode: ErrorCodes.NotFound,
                 statusCode: StatusCodes.Status404NotFound);
 
         private static Result EmailTaken()
             => Result.Failure(
                 message: "This email address is already in use.",
-                errorCode: ErrorCodes.User.EmailTaken,
+                errorCode: ErrorCodes.EmailTaken,
                 statusCode: StatusCodes.Status409Conflict);
 
         private static Result CodeInvalid()
             => Result.Failure(
                 message: "The verification code is invalid.",
-                errorCode: ErrorCodes.Verification.CodeInvalid,
+                errorCode: ErrorCodes.CodeInvalid,
                 statusCode: StatusCodes.Status400BadRequest);
+
+        private async Task<string> CreateRegistrationCodeAsync(Guid userId, CancellationToken token)
+        {
+            var rawCode = RandomNumberGenerator.GetString("0123456789", VerificationConst.CodeLength);
+
+            var codeEntity = new EmailVerificationCode
+            {
+                UserId = userId,
+                Purpose = VerificationPurposeEnum.Registration,
+                Code = rawCode,
+                ExpiredAt = DateTime.UtcNow.AddMinutes(VerificationConst.CodeExpirationMinutes),
+                AttemptsCount = 0,
+                IsUsed = false
+            };
+
+            await _context.EmailVerificationCodes.AddAsync(codeEntity, token);
+            await _context.SaveChangesAsync(token);
+
+            return rawCode;
+        }
     }
 }

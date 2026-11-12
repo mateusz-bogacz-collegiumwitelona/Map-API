@@ -3,17 +3,17 @@ using Api.Validators.Validators.Auth;
 using Domain.Const;
 using FluentValidation.Results;
 
-namespace Tests.Auth;
+namespace Tests.Validators.Auth;
 
-public class RefreshTokenRequestValidatorTests
+public class LogoutRequestValidatorTests
 {
-    private readonly RefreshTokenRequestValidator _validator = new();
+    private readonly LogoutRequestValidator _validator = new();
 
     [Test]
     public async Task Validate_WhenRefreshTokenIsNonEmpty_ReturnsValid()
     {
         // Arrange
-        var request = new RefreshTokenRequest
+        var request = new LogoutRequest
         {
             RefreshToken = "refresh-token"
         };
@@ -30,7 +30,7 @@ public class RefreshTokenRequestValidatorTests
     public async Task Validate_WhenRefreshTokenIsEmpty_ReturnsRefreshTokenValidationError()
     {
         // Arrange
-        var request = new RefreshTokenRequest
+        var request = new LogoutRequest
         {
             RefreshToken = string.Empty
         };
@@ -46,7 +46,7 @@ public class RefreshTokenRequestValidatorTests
     public async Task Validate_WhenRefreshTokenIsWhitespace_ReturnsRefreshTokenValidationError()
     {
         // Arrange
-        var request = new RefreshTokenRequest
+        var request = new LogoutRequest
         {
             RefreshToken = "   "
         };
@@ -64,7 +64,7 @@ public class RefreshTokenRequestValidatorTests
         await Assert.That(result.Errors.Count).IsEqualTo(1);
 
         var error = result.Errors[0];
-        await Assert.That(error.PropertyName).IsEqualTo(nameof(RefreshTokenRequest.RefreshToken));
-        await Assert.That(error.ErrorCode).IsEqualTo(ErrorCodes.Validation.ValidationError);
+        await Assert.That(error.PropertyName).IsEqualTo(nameof(LogoutRequest.RefreshToken));
+        await Assert.That(error.ErrorCode).IsEqualTo(ErrorCodes.ValidationError);
     }
 }

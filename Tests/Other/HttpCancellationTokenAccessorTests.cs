@@ -11,6 +11,8 @@ namespace Tests.Other
             public HttpContext? HttpContext { get; set; }
         }
 
+        #region Token Property Tests
+
         [Test]
         public async Task Token_WhenHttpContextIsNull_ReturnsCancellationTokenNone()
         {
@@ -71,5 +73,60 @@ namespace Tests.Other
             await Assert.That(token.IsCancellationRequested).IsTrue();
             await Assert.That(token).IsEqualTo(cts.Token);
         }
+        #endregion
+
+        #region ResolveCancellationToken
+        [Test]
+        public async Task ResolveCancellationToken_WhenMethodTokenCanBeCanceled_ReturnsMethodToken()
+        {
+            // Arrange
+            using var methodCts = new CancellationTokenSource();
+            using var httpCts = new CancellationTokenSource();
+            var httpContext = new DefaultHttpContext { RequestAborted = httpCts.Token };
+
+            var accessorMock = new FakeHttpContextAccessor { HttpContext = httpContext };
+            ICancellationTokenAccessor sut = new HttpCancellationTokenAccessor(accessorMock);
+
+            // Act
+            var resolvedToken = sut.ResolveCancellationToken(methodCts.Token);
+
+            // Assert
+            await Assert.That(resolvedToken).IsEqualTo(methodCts.Token);
+            await Assert.That(resolvedToken.CanBeCanceled).IsTrue();
+        }
+
+        [Test]
+        public async Task ResolveCancellationToken_WhenMethodTokenCannotBeCanceled_ReturnsAccessorToken()
+        {
+            // Arrange
+            using var httpCts = new CancellationTokenSource();
+            var httpContext = new DefaultHttpContext { RequestAborted = httpCts.Token };
+
+            var accessorMock = new FakeHttpContextAccessor { HttpContext = httpContext };
+            ICancellationTokenAccessor sut = new HttpCancellationTokenAccessor(accessorMock);
+
+            // Act
+            var resolvedToken = sut.ResolveCancellationToken(CancellationToken.None);
+
+            // Assert
+            await Assert.That(resolvedToken).IsEqualTo(httpCts.Token);
+            await Assert.That(resolvedToken.CanBeCanceled).IsTrue();
+        }
+
+        [Test]
+        public async Task ResolveCancellationToken_WhenMethodTokenCannotBeCanceledAndHttpContextIsNull_ReturnsNone()
+        {
+            // Arrange
+            var accessorMock = new FakeHttpContextAccessor { HttpContext = null };
+            ICancellationTokenAccessor sut = new HttpCancellationTokenAccessor(accessorMock);
+
+            // Act
+            var resolvedToken = sut.ResolveCancellationToken(default);
+
+            // Assert
+            await Assert.That(resolvedToken).IsEqualTo(CancellationToken.None);
+            await Assert.That(resolvedToken.CanBeCanceled).IsFalse();
+        }
+        #endregion
     }
 }

@@ -8,6 +8,7 @@ namespace Tests.Fakes
     {
         public const string EmailChangeCodeType = "EmailChangeCode";
         public const string EmailChangedNotificationType = "EmailChangedNotification";
+        public const string RegistrationVerificationCodeType = "RegistrationVerificationCode";
 
         private readonly Lock _lock = new();
 
@@ -25,6 +26,13 @@ namespace Tests.Fakes
         {
             ThrowIfConfigured();
             Record(new SentEmail(toEmail, EmailChangedNotificationType, NewEmail: newEmail));
+            return Task.CompletedTask;
+        }
+
+        public Task SendRegistrationVerificationCodeAsync(string toEmail, string firstName, string code, int validForMinutes, CancellationToken cancellationToken = default)
+        {
+            ThrowIfConfigured();
+            Record(new SentEmail(toEmail, RegistrationVerificationCodeType, Code: code));
             return Task.CompletedTask;
         }
 

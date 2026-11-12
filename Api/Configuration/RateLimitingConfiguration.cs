@@ -1,6 +1,5 @@
 using Domain.Common;
 using Domain.Const;
-using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 
@@ -48,7 +47,7 @@ namespace Api.Configuration
                     await context.HttpContext.Response.WriteAsJsonAsync(
                         Result.Failure(
                             message: "Too many requests. Please try again later.",
-                            errorCode: ErrorCodes.Common.TooManyRequests,
+                            errorCode: ErrorCodes.TooManyRequests,
                             statusCode: StatusCodes.Status429TooManyRequests),
                         cancellationToken);
                 };

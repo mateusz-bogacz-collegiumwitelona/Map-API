@@ -1,9 +1,9 @@
 ﻿using Api.Request.User;
-using Api.Validators.User;
+using Api.Validators.Validators.User;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators
+namespace Tests.Validators.User
 {
     public class EditUserValidatorTest
     {
@@ -58,7 +58,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.FirstName)
-                  .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
+                  .WithErrorCode(ErrorCodes.FirstNameInvalid);
         }
 
         [Test]
@@ -72,7 +72,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.FirstName)
-                  .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
+                  .WithErrorCode(ErrorCodes.FirstNameInvalid);
         }
 
         [Test]
@@ -86,7 +86,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.FirstName)
-                  .WithErrorCode(ErrorCodes.User.FirstNameInvalid);
+                  .WithErrorCode(ErrorCodes.FirstNameInvalid);
         }
 
         [Test]
@@ -102,7 +102,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.LastName)
-                  .WithErrorCode(ErrorCodes.User.LastNameInvalid);
+                  .WithErrorCode(ErrorCodes.LastNameInvalid);
         }
 
         [Test]
@@ -116,7 +116,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.LastName)
-                  .WithErrorCode(ErrorCodes.User.LastNameInvalid);
+                  .WithErrorCode(ErrorCodes.LastNameInvalid);
         }
 
         [Test]
@@ -130,7 +130,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.LastName)
-                  .WithErrorCode(ErrorCodes.User.LastNameInvalid);
+                  .WithErrorCode(ErrorCodes.LastNameInvalid);
         }
 
         [Test]
@@ -144,7 +144,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Bio)
-                  .WithErrorCode(ErrorCodes.User.BioInvalid);
+                  .WithErrorCode(ErrorCodes.BioInvalid);
         }
 
         [Test]
