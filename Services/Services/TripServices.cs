@@ -36,16 +36,7 @@ namespace Services.Services
 
         public async Task<Result<List<TripRouteResponse>>> GetTripRoutesAsync(Guid currentUserId, Guid? targetUserId = null, int? year = null)
         {
-            var resolvedUserId = targetUserId ?? currentUserId;
-            var isOwner = resolvedUserId == currentUserId;
-
-            var canRead = await _context.Users
-                .AnyAsync(u => u.Id == resolvedUserId && (isOwner || u.IsPublic), _ct);
-
-            if (!canRead)
-            {
-                throw new NotFoundException($"User with ID '{resolvedUserId}' was not found.");
-            }
+            var resolvedUserId = await EnsureCanReadAsync(currentUserId, targetUserId);
 
             var trips = await _context.Trips
                 .AsNoTracking()
@@ -83,16 +74,70 @@ namespace Services.Services
                 statusCode: StatusCodes.Status200OK);
         }
 
-        private static List<GeoCoordinate> ToCoordinates(Geometry geometry)
-            => DouglasPeuckerSimplifier.Simplify(geometry, GeoConst.RouteSimplificationToleranceDegrees)
-                .Coordinates
-                .Select(c => new GeoCoordinate { Latitude = c.Y, Longitude = c.X })
+        public async Task<Result<List<VisitedCountryResponse>>> GetVisitedCountriesAsync(Guid currentUserId, Guid? targetUserId = null, int? year = null)
+        {
+            var resolvedUserId = await EnsureCanReadAsync(currentUserId, targetUserId);
+
+            var visits = await _context.VisitedCountries
+                .AsNoTracking()
+                .Where(vc => vc.UserId == resolvedUserId && (year == null || vc.Year == year))
+                .Select(vc => new
+                {
+                    vc.CountryId,
+                    vc.Country.Code,
+                    vc.Country.Name,
+                    Trip = new VisitedCountryTripResponse
+                    {
+                        TripId = vc.TripId,
+                        Title = vc.Trip.Title,
+                        StartDate = vc.Trip.StartDate
+                    }
+                })
+                .ToListAsync(_ct);
+
+            var tripIds = visits.Select(v => v.Trip.TripId).Distinct().ToList();
+            var segments = _context.TripSegments.Where(s => tripIds.Contains(s.TripId));
+
+            var places = await segments
+                .Select(s => new { s.TripId, s.OriginPlace.CountryId, s.OriginPlace.Name })
+                .Union(segments.Select(s => new { s.TripId, s.DestinationPlace.CountryId, s.DestinationPlace.Name }))
+                .ToListAsync(_ct);
+
+            var placeNamesByVisit = places.ToLookup(p => (p.TripId, p.CountryId), p => p.Name);
+
+            var countries = visits
+                .GroupBy(v => new { v.CountryId, v.Code, v.Name })
+                .OrderBy(g => g.Key.Name)
+                .Select(g => new VisitedCountryResponse
+                {
+                    CountryCode = g.Key.Code,
+                    CountryName = g.Key.Name,
+                    PlaceNames = g
+                        .SelectMany(v => placeNamesByVisit[(v.Trip.TripId, g.Key.CountryId)])
+                        .Distinct()
+                        .Order()
+                        .ToList(),
+                    Trips = g
+                        .Select(v => v.Trip)
+                        .DistinctBy(t => t.TripId)
+                        .OrderByDescending(t => t.StartDate)
+                        .ThenBy(t => t.TripId)
+                        .ToList()
+                })
                 .ToList();
 
+            _logger.LogInformation("Retrieved {Count} visited countries for user ID: {UserId}, Year: {Year}", countries.Count, resolvedUserId, year);
+
+            return Result<List<VisitedCountryResponse>>.Success(
+                message: "Visited countries retrieved successfully.",
+                data: countries,
+                statusCode: StatusCodes.Status200OK);
+        }
+
         public async Task<Result<PagedResult<TripSummaryResponse>>> GetUserTripsAsync(
-            BasicListCommand command,
-            Guid userId,
-            CancellationToken ct = default)
+          BasicListCommand command,
+          Guid userId,
+          CancellationToken ct = default)
         {
             var token = _ctAccessor.ResolveCancellationToken(ct);
             token.ThrowIfCancellationRequested();
@@ -124,5 +169,27 @@ namespace Services.Services
                 })
                 .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Trips", token);
         }
+
+        private async Task<Guid> EnsureCanReadAsync(Guid currentUserId, Guid? targetUserId)
+        {
+            var resolvedUserId = targetUserId ?? currentUserId;
+            var isOwner = resolvedUserId == currentUserId;
+
+            var canRead = await _context.Users
+                .AnyAsync(u => u.Id == resolvedUserId && (isOwner || u.IsPublic), _ct);
+
+            if (!canRead)
+            {
+                throw new NotFoundException($"User with ID '{resolvedUserId}' was not found.");
+            }
+
+            return resolvedUserId;
+        }
+
+        private static List<GeoCoordinate> ToCoordinates(Geometry geometry)
+            => DouglasPeuckerSimplifier.Simplify(geometry, GeoConst.RouteSimplificationToleranceDegrees)
+                .Coordinates
+                .Select(c => new GeoCoordinate { Latitude = c.Y, Longitude = c.X })
+                .ToList();
     }
 }

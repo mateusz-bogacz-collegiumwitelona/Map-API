@@ -25,6 +25,7 @@
         public const string BadRequest = "COMMON_003";
         public const string InternalError = "COMMON_004";
         public const string TooManyRequests = "COMMON_005";
+        public const string GuidInvalid = "COMMON_006";
         public const string AccessDenied = "ACCESS_DENIED";
         #endregion
 
@@ -42,6 +43,10 @@
         public const string CodeInvalid = "VER_001";
         public const string CodeExpired = "VER_002";
         public const string AttemptsExceeded = "VER_003";
+        #endregion
+
+        #region Trip
+        public const string YearInvalid = "TRIP_001";
         #endregion
     }
 }

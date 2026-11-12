@@ -28,6 +28,8 @@ namespace Tests.Services
 
         private ITripServices _sut = null!;
         private string _currentSchema = null!;
+        private Country _poland = null!;
+        private Country _italy = null!;
         private Place _krakow = null!;
         private Place _rome = null!;
 
@@ -92,25 +94,11 @@ namespace Tests.Services
             var createScript = _context.Database.GenerateCreateScript();
             await _context.Database.ExecuteSqlRawAsync(createScript);
 
-            var country = new Country
-            {
-                Name = "Test",
-                Code = "TS",
-                Boundary = new MultiPolygon(new[]
-                {
-                    new Polygon(new LinearRing(new[]
-                    {
-                        new Coordinate(0, 0),
-                        new Coordinate(0, 1),
-                        new Coordinate(1, 1),
-                        new Coordinate(0, 0)
-                    }))
-                })
-                { SRID = GeoConst.SRID }
-            };
+            _poland = CreateCountry("Poland", "PL");
+            _italy = CreateCountry("Italy", "IT");
 
-            _krakow = new Place { Name = "Krakow", Country = country, Location = new Point(19.94, 50.06) { SRID = GeoConst.SRID } };
-            _rome = new Place { Name = "Rome", Country = country, Location = new Point(12.49, 41.90) { SRID = GeoConst.SRID } };
+            _krakow = CreatePlace("Krakow", _poland, 19.94, 50.06);
+            _rome = CreatePlace("Rome", _italy, 12.49, 41.90);
 
             _context.Places.AddRange(_krakow, _rome);
             await _context.SaveChangesAsync();
@@ -150,11 +138,11 @@ namespace Tests.Services
         }
 
         private async Task<Trip> AddTripAsync(
-    User user,
-    DateTime startDate,
-    string title = "Trip",
-    string? description = null,
-    DateTime? endDate = null)
+            User user,
+            DateTime startDate,
+            string title = "Trip",
+            string? description = null,
+            DateTime? endDate = null)
         {
             var trip = new Trip
             {
@@ -202,6 +190,50 @@ namespace Tests.Services
 
             return segment;
         }
+
+        private async Task<Place> AddPlaceAsync(string name, Country country)
+        {
+            var place = CreatePlace(name, country, 0, 0);
+
+            _context.Places.Add(place);
+            await _context.SaveChangesAsync();
+
+            return place;
+        }
+
+        private async Task AddVisitAsync(Trip trip, Country country)
+        {
+            _context.VisitedCountries.Add(new VisitedCountry
+            {
+                UserId = trip.UserId,
+                TripId = trip.Id,
+                CountryId = country.Id,
+                Year = trip.StartDate.Year
+            });
+
+            await _context.SaveChangesAsync();
+        }
+
+        private static Country CreateCountry(string name, string code)
+            => new Country
+            {
+                Name = name,
+                Code = code,
+                Boundary = new MultiPolygon(new[]
+                {
+                    new Polygon(new LinearRing(new[]
+                    {
+                        new Coordinate(0, 0),
+                        new Coordinate(0, 1),
+                        new Coordinate(1, 1),
+                        new Coordinate(0, 0)
+                    }))
+                })
+                { SRID = GeoConst.SRID }
+            };
+
+        private static Place CreatePlace(string name, Country country, double longitude, double latitude)
+            => new Place { Name = name, Country = country, Location = new Point(longitude, latitude) { SRID = GeoConst.SRID } };
 
         private static DateTime Utc(int year, int month, int day, int hour = 0, int minute = 0)
             => new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Utc);
