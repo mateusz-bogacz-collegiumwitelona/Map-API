@@ -8,7 +8,10 @@ using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Simplify;
 using Services.Accessors.Interfaces;
+using Services.Command.List;
+using Services.Helpers;
 using Services.Interfaces;
+using Services.QueryExtension;
 using Services.Response.Trip;
 
 namespace Services.Services
@@ -85,5 +88,41 @@ namespace Services.Services
                 .Coordinates
                 .Select(c => new GeoCoordinate { Latitude = c.Y, Longitude = c.X })
                 .ToList();
+
+        public async Task<Result<PagedResult<TripSummaryResponse>>> GetUserTripsAsync(
+            BasicListCommand command,
+            Guid userId,
+            CancellationToken ct = default)
+        {
+            var token = _ctAccessor.ResolveCancellationToken(ct);
+            token.ThrowIfCancellationRequested();
+
+            return await _context.Trips
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .ApplySearch(command.SearchTerm)
+                .ApplySorting(command.SortBy, command.SortDescending)
+                .Select(t => new TripSummaryResponse
+                {
+                    Id = t.Id,
+                    Title = t.Title,
+                    Description = t.Description == null
+                        ? null
+                        : t.Description.Length > 100
+                            ? t.Description.Substring(0, 100) + "..."
+                            : t.Description,
+                    StartDate = t.StartDate,
+                    EndDate = t.EndDate,
+                    TotalDistance = _context.TripSegments
+                        .Where(s => s.TripId == t.Id)
+                        .Sum(s => (decimal?)s.DistanceKm) ?? 0m,
+                    TransportTypes = _context.TripSegments
+                        .Where(s => s.TripId == t.Id)
+                        .Select(s => s.TransportType)
+                        .Distinct()
+                        .ToList()
+                })
+                .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Trips", token);
+        }
     }
 }

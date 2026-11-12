@@ -1,4 +1,6 @@
 using Api.Controllers.Base;
+using Api.Mappers;
+using Api.Request.List;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +24,20 @@ namespace Api.Controllers
             [FromServices] ITripServices trips)
         {
             var result = await trips.GetTripRoutesAsync(CurrentUserId, userId, year);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Get paginated list of user trips")]
+        [EndpointDescription("Returns a paginated, chronologically sorted list of trips for the authenticated user (newest first by default). Each item includes header details, summed distance across all active segments, and distinct transport modes used. Supports optional case-insensitive, accent-insensitive search by title or description, and sorting by startDate, endDate, or title.")]
+        [ProducesResponseType(typeof(Result<PagedResult<TripSummaryResponse>>), StatusCodes.Status200OK)]
+        [HttpGet]
+        public async Task<IActionResult> GetUserTripsAsync(
+            [FromServices] ITripServices trips,
+            [FromServices] ListMapper mapper,
+            [FromQuery] BasicListRequest request
+            )
+        {
+            var result = await trips.GetUserTripsAsync(mapper.MapBasicList(request), CurrentUserId);
             return HandleResult(result);
         }
     }
