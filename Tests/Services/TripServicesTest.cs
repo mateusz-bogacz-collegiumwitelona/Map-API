@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using Npgsql;
+using Services.Command.List;
 using Services.Interfaces;
 using Services.Response.Trip;
 using Services.Services;
@@ -136,13 +137,20 @@ namespace Tests.Services
             return user;
         }
 
-        private async Task<Trip> AddTripAsync(User user, DateTime startDate, string title = "Trip")
+        private async Task<Trip> AddTripAsync(
+            User user,
+            DateTime startDate,
+            string title = "Trip",
+            string? description = null,
+            DateTime? endDate = null)
         {
             var trip = new Trip
             {
                 UserId = user.Id,
                 Title = title,
-                StartDate = startDate
+                Description = description,
+                StartDate = startDate,
+                EndDate = endDate
             };
 
             _context.Trips.Add(trip);
@@ -157,24 +165,23 @@ namespace Tests.Services
             TransportTypeEnum transportType = TransportTypeEnum.Car,
             bool isFallbackRoute = false,
             Coordinate[]? route = null,
-            Place? origin = null,
-            Place? destination = null)
+            decimal distanceKm = 1096.50m)
         {
             var segment = new TripSegment
             {
                 TripId = trip.Id,
                 OrderIndex = orderIndex,
                 TransportType = transportType,
-                OriginPlaceId = (origin ?? _krakow).Id,
-                DestinationPlaceId = (destination ?? _rome).Id,
-                DistanceKm = 1096.50m,
+                OriginPlaceId = _krakow.Id,
+                DestinationPlaceId = _rome.Id,
+                DistanceKm = distanceKm,
                 IsFallbackRoute = isFallbackRoute,
                 Geometry = new LineString(route ?? new[]
                 {
-                    _krakow.Location.Coordinate,
-                    new Coordinate(16.00, 46.00),
-                    _rome.Location.Coordinate
-                })
+            _krakow.Location.Coordinate,
+            new Coordinate(16.00, 46.00),
+            _rome.Location.Coordinate
+        })
                 { SRID = GeoConst.SRID }
             };
 
@@ -606,231 +613,231 @@ namespace Tests.Services
         }
         #endregion
 
-        #region Visited countries
+        #region GetUserTripsAsync
         [Test]
-        public async Task GetVisitedCountriesAsync_ShouldGroupPlacesAndTripsByCountryOrderedByName()
+        public async Task GetUserTripsAsync_ShouldReturnAggregatedTripSummary()
         {
             // Arrange
             var user = await AddUserAsync();
-            var trip = await AddTripAsync(user, Utc(2025, 5, 1), "Italy trip");
-            await AddSegmentAsync(trip, 0);
-            await AddVisitAsync(trip, _poland);
-            await AddVisitAsync(trip, _italy);
+            var trip = await AddTripAsync(
+                user,
+                Utc(2025, 5, 1),
+                title: "Eurotrip",
+                description: "Short description",
+                endDate: Utc(2025, 5, 12));
+
+            await AddSegmentAsync(trip, 0, TransportTypeEnum.Plane, distanceKm: 1200.50m);
+            await AddSegmentAsync(trip, 1, TransportTypeEnum.Train, distanceKm: 300.25m);
+            await AddSegmentAsync(trip, 2, TransportTypeEnum.Plane, distanceKm: 850.00m);
 
             // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id);
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), user.Id);
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            var countries = result.Data!;
-            await Assert.That(countries.Select(c => c.CountryCode).SequenceEqual(new[] { "IT", "PL" })).IsTrue();
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(1);
 
-            var italy = countries[0];
-            await Assert.That(italy.CountryName).IsEqualTo("Italy");
-            await Assert.That(italy.PlaceNames.SequenceEqual(new[] { "Rome" })).IsTrue();
-            await Assert.That(italy.Trips.Single().TripId).IsEqualTo(trip.Id);
-            await Assert.That(italy.Trips.Single().Title).IsEqualTo("Italy trip");
-            await Assert.That(italy.Trips.Single().StartDate).IsEqualTo(Utc(2025, 5, 1));
-
-            await Assert.That(countries[1].PlaceNames.SequenceEqual(new[] { "Krakow" })).IsTrue();
+            var item = result.Data.Items.Single();
+            await Assert.That(item.Id).IsEqualTo(trip.Id);
+            await Assert.That(item.Title).IsEqualTo("Eurotrip");
+            await Assert.That(item.Description).IsEqualTo("Short description");
+            await Assert.That(item.StartDate).IsEqualTo(Utc(2025, 5, 1));
+            await Assert.That(item.EndDate).IsEqualTo(Utc(2025, 5, 12));
+            await Assert.That(item.TotalDistance).IsEqualTo(2350.75m);
+            await Assert.That(item.TransportTypes.Count).IsEqualTo(2);
+            await Assert.That(item.TransportTypes).Contains(TransportTypeEnum.Plane);
+            await Assert.That(item.TransportTypes).Contains(TransportTypeEnum.Train);
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenCountryIsVisitedByManyTrips_ShouldMergeTripsAndPlaces()
+        public async Task GetUserTripsAsync_WhenTripHasNoSegments_ShouldReturnZeroDistanceAndEmptyTransportTypes()
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
-            var older = await AddTripAsync(user, Utc(2023, 1, 1), "Older");
-            var newer = await AddTripAsync(user, Utc(2025, 1, 1), "Newer");
-            await AddSegmentAsync(older, 0, origin: warsaw, destination: _krakow);
-            await AddSegmentAsync(newer, 0, origin: _krakow, destination: warsaw);
-            await AddSegmentAsync(newer, 1, origin: warsaw, destination: _krakow);
-            await AddVisitAsync(older, _poland);
-            await AddVisitAsync(newer, _poland);
+            var trip = await AddTripAsync(user, Utc(2025, 6, 1), "Planned Trip");
 
             // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id);
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), user.Id);
 
             // Assert
-            var poland = result.Data!.Single();
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Krakow", "Warsaw" })).IsTrue();
-            await Assert.That(poland.Trips.Select(t => t.TripId).SequenceEqual(new[] { newer.Id, older.Id })).IsTrue();
+            var item = result.Data!.Items.Single();
+            await Assert.That(item.Id).IsEqualTo(trip.Id);
+            await Assert.That(item.TotalDistance).IsEqualTo(0m);
+            await Assert.That(item.TransportTypes).IsEmpty();
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenYearIsSet_ShouldReturnOnlyCountriesAndPlacesOfTripsStartedThatYear()
+        public async Task GetUserTripsAsync_WhenDescriptionExceeds100Characters_ShouldTruncateWithEllipsis()
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
-            var trip2024 = await AddTripAsync(user, Utc(2024, 12, 31, 23, 59));
-            var trip2025 = await AddTripAsync(user, Utc(2025, 1, 1));
-            await AddSegmentAsync(trip2024, 0);
-            await AddSegmentAsync(trip2025, 0, origin: warsaw, destination: warsaw);
-            await AddVisitAsync(trip2024, _poland);
-            await AddVisitAsync(trip2024, _italy);
-            await AddVisitAsync(trip2025, _poland);
+            var exact100 = new string('a', 100);
+            var over100 = new string('b', 105);
+
+            var exactTrip = await AddTripAsync(user, Utc(2025, 5, 1), "Exact", description: exact100);
+            var longTrip = await AddTripAsync(user, Utc(2025, 5, 2), "Long", description: over100);
 
             // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id, year: 2025);
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), user.Id);
 
             // Assert
-            var poland = result.Data!.Single();
-            await Assert.That(poland.CountryCode).IsEqualTo("PL");
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Warsaw" })).IsTrue();
-            await Assert.That(poland.Trips.Single().TripId).IsEqualTo(trip2025.Id);
+            var items = result.Data!.Items;
+            var longItem = items.Single(x => x.Id == longTrip.Id);
+            var exactItem = items.Single(x => x.Id == exactTrip.Id);
+
+            await Assert.That(exactItem.Description).IsEqualTo(exact100);
+            await Assert.That(longItem.Description).IsEqualTo(new string('b', 100) + "...");
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenNoTripsInYear_ShouldReturnEmptyList()
-        {
-            // Arrange
-            var user = await AddUserAsync();
-            var trip = await AddTripAsync(user, Utc(2025, 1, 1));
-            await AddVisitAsync(trip, _poland);
-
-            // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id, year: 2020);
-
-            // Assert
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            await Assert.That(result.Data!).IsEmpty();
-        }
-
-        [Test]
-        public async Task GetVisitedCountriesAsync_WhenUserHasNoVisits_ShouldReturnEmptyList()
-        {
-            // Arrange
-            var user = await AddUserAsync();
-
-            // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id);
-
-            // Assert
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            await Assert.That(result.Data!).IsEmpty();
-        }
-
-        [Test]
-        public async Task GetVisitedCountriesAsync_ShouldNotReturnCountriesOfOtherUsers()
+        public async Task GetUserTripsAsync_ShouldExcludeOtherUsersAndSoftDeletedTripsAndSegments()
         {
             // Arrange
             var user = await AddUserAsync();
             var otherUser = await AddUserAsync();
-            var trip = await AddTripAsync(otherUser, Utc(2025, 1, 1));
-            await AddVisitAsync(trip, _poland);
 
-            // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id);
+            await AddTripAsync(otherUser, Utc(2025, 7, 1), "Other User Trip");
+            var deletedTrip = await AddTripAsync(user, Utc(2025, 6, 1), "Deleted Trip");
+            var activeTrip = await AddTripAsync(user, Utc(2025, 5, 1), "Active Trip");
 
-            // Assert
-            await Assert.That(result.Data!).IsEmpty();
-        }
-
-        [Test]
-        public async Task GetVisitedCountriesAsync_ShouldExcludeSoftDeletedTripsAndSegments()
-        {
-            // Arrange
-            var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
-            var deletedTrip = await AddTripAsync(user, Utc(2025, 1, 1));
-            var activeTrip = await AddTripAsync(user, Utc(2024, 1, 1));
-            await AddSegmentAsync(deletedTrip, 0);
-            await AddSegmentAsync(activeTrip, 0, origin: _krakow, destination: _krakow);
-            var deletedSegment = await AddSegmentAsync(activeTrip, 1, origin: warsaw, destination: warsaw);
-            await AddVisitAsync(deletedTrip, _poland);
-            await AddVisitAsync(deletedTrip, _italy);
-            await AddVisitAsync(activeTrip, _poland);
+            await AddSegmentAsync(activeTrip, 0, TransportTypeEnum.Car, distanceKm: 250m);
+            var deletedSegment = await AddSegmentAsync(activeTrip, 1, TransportTypeEnum.Plane, distanceKm: 900m);
 
             _context.Remove(deletedTrip);
             _context.Remove(deletedSegment);
             await _context.SaveChangesAsync();
 
             // Act
-            var result = await _sut.GetVisitedCountriesAsync(user.Id);
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), user.Id);
 
             // Assert
-            var poland = result.Data!.Single();
-            await Assert.That(poland.CountryCode).IsEqualTo("PL");
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Krakow" })).IsTrue();
-            await Assert.That(poland.Trips.Single().TripId).IsEqualTo(activeTrip.Id);
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(1);
+            var item = result.Data.Items.Single();
+            await Assert.That(item.Id).IsEqualTo(activeTrip.Id);
+            await Assert.That(item.TotalDistance).IsEqualTo(250m);
+            await Assert.That(item.TransportTypes.Single()).IsEqualTo(TransportTypeEnum.Car);
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenOwnerHasPrivateProfile_ShouldReturnCountries()
+        public async Task GetUserTripsAsync_ShouldOrderByStartDateDescendingByDefault()
         {
             // Arrange
-            var owner = await AddUserAsync(isPublic: false);
-            var trip = await AddTripAsync(owner, Utc(2025, 1, 1));
-            await AddVisitAsync(trip, _poland);
+            var user = await AddUserAsync();
+            var oldest = await AddTripAsync(user, Utc(2023, 1, 1), "Oldest");
+            var middle = await AddTripAsync(user, Utc(2024, 1, 1), "Middle");
+            var newest = await AddTripAsync(user, Utc(2025, 1, 1), "Newest");
 
             // Act
-            var result = await _sut.GetVisitedCountriesAsync(owner.Id, owner.Id);
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), user.Id);
 
             // Assert
-            await Assert.That(result.Data!.Single().CountryCode).IsEqualTo("PL");
+            var ids = result.Data!.Items.Select(x => x.Id).ToList();
+            await Assert.That(ids.SequenceEqual(new[] { newest.Id, middle.Id, oldest.Id })).IsTrue();
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenTargetProfileIsPublic_ShouldReturnCountries()
+        public async Task GetUserTripsAsync_WhenSortDescendingIsFalse_ShouldOrderChronologicallyAscending()
         {
             // Arrange
-            var requester = await AddUserAsync();
-            var target = await AddUserAsync(isPublic: true);
-            var trip = await AddTripAsync(target, Utc(2025, 1, 1));
-            await AddVisitAsync(trip, _poland);
+            var user = await AddUserAsync();
+            var oldest = await AddTripAsync(user, Utc(2023, 1, 1), "Oldest");
+            var newest = await AddTripAsync(user, Utc(2025, 1, 1), "Newest");
+
+            var command = new BasicListCommand
+            {
+                SortBy = "startDate",
+                SortDescending = false
+            };
 
             // Act
-            var result = await _sut.GetVisitedCountriesAsync(requester.Id, target.Id);
+            var result = await _sut.GetUserTripsAsync(command, user.Id);
 
             // Assert
-            await Assert.That(result.Data!.Single().CountryCode).IsEqualTo("PL");
+            var ids = result.Data!.Items.Select(x => x.Id).ToList();
+            await Assert.That(ids.SequenceEqual(new[] { oldest.Id, newest.Id })).IsTrue();
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenTargetProfileIsPrivate_ShouldThrowNotFoundException()
+        public async Task GetUserTripsAsync_ShouldPaginateWithoutDuplicatesAcrossPagesEvenWithIdenticalStartDates()
         {
             // Arrange
-            var requester = await AddUserAsync();
-            var target = await AddUserAsync(isPublic: false);
-            var trip = await AddTripAsync(target, Utc(2025, 1, 1));
-            await AddVisitAsync(trip, _poland);
+            var user = await AddUserAsync();
+            var sameDate = Utc(2025, 5, 1);
+            var createdIds = new List<Guid>();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{target.Id}' was not found.");
+            for (int i = 0; i < 5; i++)
+            {
+                var trip = await AddTripAsync(user, sameDate, $"Trip {i}");
+                createdIds.Add(trip.Id);
+            }
+
+            // Act
+            var page1 = await _sut.GetUserTripsAsync(new BasicListCommand { PageNumber = 1, PageSize = 2 }, user.Id);
+            var page2 = await _sut.GetUserTripsAsync(new BasicListCommand { PageNumber = 2, PageSize = 2 }, user.Id);
+            var page3 = await _sut.GetUserTripsAsync(new BasicListCommand { PageNumber = 3, PageSize = 2 }, user.Id);
+            var page4 = await _sut.GetUserTripsAsync(new BasicListCommand { PageNumber = 4, PageSize = 2 }, user.Id);
+
+            // Assert
+            await Assert.That(page1.Data!.TotalCount).IsEqualTo(5);
+            await Assert.That(page1.Data.TotalPages).IsEqualTo(3);
+            await Assert.That(page1.Data.HasPreviousPage).IsFalse();
+            await Assert.That(page1.Data.HasNextPage).IsTrue();
+
+            await Assert.That(page2.Data!.HasPreviousPage).IsTrue();
+            await Assert.That(page2.Data.HasNextPage).IsTrue();
+
+            await Assert.That(page3.Data!.Items.Count).IsEqualTo(1);
+            await Assert.That(page3.Data.HasNextPage).IsFalse();
+
+            await Assert.That(page4.Data!.PageNumber).IsEqualTo(3);
+            await Assert.That(page4.Data.Items.Single().Id).IsEqualTo(page3.Data.Items.Single().Id);
+            await Assert.That(page4.Data.HasNextPage).IsFalse();
+
+            var allReturnedIds = page1.Data.Items
+                .Concat(page2.Data.Items)
+                .Concat(page3.Data.Items)
+                .Select(x => x.Id)
+                .ToList();
+
+            await Assert.That(allReturnedIds.Count).IsEqualTo(5);
+            await Assert.That(allReturnedIds.Distinct().Count()).IsEqualTo(5);
+            await Assert.That(allReturnedIds.OrderBy(x => x).SequenceEqual(createdIds.OrderBy(x => x))).IsTrue();
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenTargetDoesNotExist_ShouldThrowNotFoundException()
+        public async Task GetUserTripsAsync_ShouldSearchCaseAndAccentInsensitivelyInTitleAndDescription()
         {
             // Arrange
-            var requester = await AddUserAsync();
-            var targetId = Guid.NewGuid();
+            var user = await AddUserAsync();
+            var matchingByTitle = await AddTripAsync(user, Utc(2025, 5, 1), "Podróż do Krakowa");
+            var matchingByDescription = await AddTripAsync(user, Utc(2025, 5, 2), "Wakacje", description: "Zwiedzanie Łodzi i okolic");
+            await AddTripAsync(user, Utc(2025, 5, 3), "Wyprawa do Rzymu", description: "Koloseum");
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, targetId))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{targetId}' was not found.");
+            // Act
+            var titleSearch = await _sut.GetUserTripsAsync(new BasicListCommand { SearchTerm = "podroz krakow" }, user.Id);
+            var descriptionSearch = await _sut.GetUserTripsAsync(new BasicListCommand { SearchTerm = "lodz" }, user.Id);
+
+            // Assert
+            await Assert.That(titleSearch.Data!.Items.Single().Id).IsEqualTo(matchingByTitle.Id);
+            await Assert.That(descriptionSearch.Data!.Items.Single().Id).IsEqualTo(matchingByDescription.Id);
         }
 
         [Test]
-        public async Task GetVisitedCountriesAsync_WhenTargetAccountIsDeleted_ShouldThrowNotFoundException()
+        public async Task GetUserTripsAsync_WhenUserHasNoTrips_ShouldReturnEmptyPagedResult()
         {
             // Arrange
-            var requester = await AddUserAsync();
-            var target = await AddUserAsync(isPublic: true);
-            var trip = await AddTripAsync(target, Utc(2025, 1, 1));
-            await AddVisitAsync(trip, _poland);
+            var user = await AddUserAsync();
 
-            _context.Remove(target);
-            await _context.SaveChangesAsync();
+            // Act
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand { PageNumber = 1, PageSize = 10 }, user.Id);
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>();
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.Items).IsEmpty();
+            await Assert.That(result.Data.TotalCount).IsEqualTo(0);
+            await Assert.That(result.Data.TotalPages).IsEqualTo(0);
+            await Assert.That(result.Data.HasNextPage).IsFalse();
+            await Assert.That(result.Data.HasPreviousPage).IsFalse();
         }
         #endregion
     }

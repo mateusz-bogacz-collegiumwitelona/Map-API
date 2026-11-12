@@ -82,7 +82,7 @@ namespace Services.Services.Auth
             if (!user.EmailConfirmed)
             {
                 _logger.LogWarning("Login attempt failed for user with email: {Email}. Email not confirmed.", command.Email);
-                return InvalidCredentials();
+                return EmailNotConfirmed();
             }
 
             _logger.LogInformation("User with email: {Email} logged in successfully.", command.Email);
@@ -184,5 +184,11 @@ namespace Services.Services.Auth
                 statusCode: StatusCodes.Status200OK,
                 data: response);
         }
+
+        private static Result<AuthResponse> EmailNotConfirmed()
+            => Result<AuthResponse>.Failure(
+                message: "Email address is not confirmed.",
+                errorCode: ErrorCodes.EmailNotConfirmed,
+                statusCode: StatusCodes.Status403Forbidden);
     }
 }
