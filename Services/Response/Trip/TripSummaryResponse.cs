@@ -9,7 +9,7 @@ namespace Services.Response.Trip
         public string? Description { get; init; }
         public required DateTime StartDate { get; init; }
         public DateTime? EndDate { get; init; }
-        public decimal TotalDistance { get; init; } // x1000 (metr)
+        public decimal TotalDistance { get; init; } 
         public IReadOnlyList<TransportTypeEnum> TransportTypes { get; init; } = [];
     }
 }
