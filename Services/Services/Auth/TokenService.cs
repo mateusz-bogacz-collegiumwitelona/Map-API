@@ -85,8 +85,6 @@ namespace Services.Services.Auth
 
             try
             {
-                // IsRevoked is an optimistic concurrency token, so this update only succeeds
-                // while the token is still active in the database.
                 await _context.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
@@ -102,7 +100,6 @@ namespace Services.Services.Auth
         {
             var now = DateTime.UtcNow;
 
-            // Conditional update keeps revocation atomic: only one concurrent request can affect the row.
             var rowsAffected = await _context.RefreshTokens
                 .Where(t => t.Token == token && !t.IsRevoked)
                 .ExecuteUpdateAsync(
@@ -119,7 +116,6 @@ namespace Services.Services.Auth
         {
             var now = DateTime.UtcNow;
 
-            // Bulk update avoids loading every active token into memory.
             await _context.RefreshTokens
                 .Where(t => t.UserId == userId && !t.IsRevoked)
                 .ExecuteUpdateAsync(

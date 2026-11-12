@@ -8,28 +8,29 @@ namespace Api.Configuration
         {
             services.AddOpenApi(options =>
             {
-
                 options.AddDocumentTransformer(static (document, context, cancellationToken) =>
                 {
                     document.Components ??= new OpenApiComponents();
-
                     document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
 
-                    var jwtScheme = new OpenApiSecurityScheme
+                    var scheme = new OpenApiSecurityScheme
                     {
                         Type = SecuritySchemeType.Http,
                         Scheme = "bearer",
                         BearerFormat = "JWT",
-                        Description = "Wklej tutaj swój wygenerowany token JWT."
+                        Description = "Wklej tutaj swój token JWT (sam token, bez słowa Bearer)."
                     };
 
-                    document.Components.SecuritySchemes.Add("Bearer", jwtScheme);
+                    document.Components.SecuritySchemes["Bearer"] = scheme;
+
                     document.Security ??= new List<OpenApiSecurityRequirement>();
 
-                    document.Security.Add(new OpenApiSecurityRequirement
+                    var requirement = new OpenApiSecurityRequirement
                     {
-                        [new OpenApiSecuritySchemeReference("Bearer")] = new List<string>()
-                    });
+                        [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
+                    };
+
+                    document.Security.Add(requirement);
 
                     return Task.CompletedTask;
                 });
@@ -45,7 +46,8 @@ namespace Api.Configuration
                 app.MapOpenApi();
                 app.UseSwaggerUI(options =>
                 {
-                    options.SwaggerEndpoint("/openapi/v1.json", "SPCRM API V1");
+                    options.SwaggerEndpoint("/openapi/v1.json", "MAP API V1");
+                    options.ConfigObject.PersistAuthorization = true;
                 });
             }
 

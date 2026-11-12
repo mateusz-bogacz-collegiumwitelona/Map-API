@@ -1,9 +1,9 @@
 using Api.Request.Trip;
-using Api.Validators.Trip;
+using Api.Validators.Validators.Trip;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators
+namespace Tests.Validators.Trip
 {
     public class TripFilterRequestValidatorTest
     {
@@ -46,7 +46,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.UserId)
-                  .WithErrorCode(ErrorCodes.User.UserIdInvalid);
+                  .WithErrorCode(ErrorCodes.UserIdInvalid);
         }
 
         [Test]
@@ -76,7 +76,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Year)
-                  .WithErrorCode(ErrorCodes.Trip.YearInvalid);
+                  .WithErrorCode(ErrorCodes.YearInvalid);
         }
 
         [Test]
@@ -90,7 +90,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Year)
-                  .WithErrorCode(ErrorCodes.Trip.YearInvalid);
+                  .WithErrorCode(ErrorCodes.YearInvalid);
         }
     }
 }

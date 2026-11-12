@@ -1,9 +1,9 @@
-using Api.Request.User;
-using Api.Validators.User;
+using Api.Request.Account;
+using Api.Validators.Validators.Account;
 using Domain.Const;
 using FluentValidation.TestHelper;
 
-namespace Tests.Validators
+namespace Tests.Validators.Account
 {
     public class ChangeEmailRequestValidatorTest
     {
@@ -42,7 +42,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.NewEmail)
-                .WithErrorCode(ErrorCodes.User.EmailInvalid);
+                .WithErrorCode(ErrorCodes.EmailInvalid);
             await Assert.That(result.IsValid).IsFalse();
         }
 
@@ -57,7 +57,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.NewEmail)
-                .WithErrorCode(ErrorCodes.User.EmailInvalid);
+                .WithErrorCode(ErrorCodes.EmailInvalid);
             await Assert.That(result.IsValid).IsFalse();
         }
 
@@ -72,7 +72,7 @@ namespace Tests.Validators
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.NewEmail)
-                .WithErrorCode(ErrorCodes.User.EmailInvalid);
+                .WithErrorCode(ErrorCodes.EmailInvalid);
             await Assert.That(result.IsValid).IsFalse();
         }
     }

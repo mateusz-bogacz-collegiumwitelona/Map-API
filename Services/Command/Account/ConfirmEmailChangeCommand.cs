@@ -1,4 +1,4 @@
-namespace Services.Command.User
+namespace Services.Command.Account
 {
     public record ConfirmEmailChangeCommand
     {

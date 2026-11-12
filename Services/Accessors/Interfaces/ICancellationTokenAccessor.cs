@@ -3,5 +3,6 @@
     public interface ICancellationTokenAccessor
     {
         CancellationToken Token { get; }
+        CancellationToken ResolveCancellationToken(CancellationToken cancellationToken);
     }
 }

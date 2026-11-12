@@ -16,7 +16,17 @@ namespace Api.Mappers.Helper
         }
 
         [UserMapping(Default = false)]
-        protected static string TrimValue(string value)
-            => value.Trim();
+        protected static string NormalizeRequiredName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+            var trimmed = value.Trim();
+
+            return NameCaseFormatter.Format(trimmed) ?? string.Empty;
+        }
+
+
+        [UserMapping(Default = false)]
+        protected string Trim(string value) => value.Trim();
     }
 }

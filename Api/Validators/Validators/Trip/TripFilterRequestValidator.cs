@@ -2,7 +2,7 @@ using Api.Request.Trip;
 using Domain.Const;
 using FluentValidation;
 
-namespace Api.Validators.Trip
+namespace Api.Validators.Validators.Trip
 {
     public class TripFilterRequestValidator : AbstractValidator<TripFilterRequest>
     {
@@ -10,12 +10,12 @@ namespace Api.Validators.Trip
         {
             RuleFor(x => x.UserId)
                 .NotEqual(Guid.Empty)
-                    .WithErrorCode(ErrorCodes.User.UserIdInvalid);
+                    .WithErrorCode(ErrorCodes.UserIdInvalid);
 
             RuleFor(x => x.Year)
                 .Must(year => year >= TripConst.MinFilterYear && year <= MaxFilterYear())
                     .When(x => x.Year.HasValue)
-                    .WithErrorCode(ErrorCodes.Trip.YearInvalid)
+                    .WithErrorCode(ErrorCodes.YearInvalid)
                     .WithMessage(x => $"Year must be between {TripConst.MinFilterYear} and {MaxFilterYear()}.");
         }
 

@@ -14,5 +14,11 @@ namespace Services.Accessors
         }
 
         public CancellationToken Token => _httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None;
+
+        public CancellationToken ResolveCancellationToken(CancellationToken cancellationToken)
+            => cancellationToken.CanBeCanceled
+                    ? cancellationToken
+                    : Token;
+
     }
 }
