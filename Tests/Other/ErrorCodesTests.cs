@@ -14,6 +14,8 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.AccountBanned).IsEqualTo("AUTH_005");
 
             await Assert.That(ErrorCodes.ValidationError).IsEqualTo("VAL_001");
+            await Assert.That(ErrorCodes.PageNumberInvalid).IsEqualTo("VAL_002");
+            await Assert.That(ErrorCodes.PageSizeInvalid).IsEqualTo("VAL_003");
 
             await Assert.That(ErrorCodes.InvalidOperation).IsEqualTo("COMMON_001");
             await Assert.That(ErrorCodes.NotFound).IsEqualTo("COMMON_002");
@@ -40,6 +42,8 @@ namespace Tests.Other
                 ErrorCodes.AccountLocked,
                 ErrorCodes.AccountBanned,
                 ErrorCodes.ValidationError,
+                ErrorCodes.PageNumberInvalid,
+                ErrorCodes.PageSizeInvalid,
                 ErrorCodes.InvalidOperation,
                 ErrorCodes.NotFound,
                 ErrorCodes.BadRequest,
