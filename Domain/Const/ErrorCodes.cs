@@ -40,14 +40,14 @@
         public const string UserNotFound = "USR_008";
         #endregion
 
+        #region Trip
+        public const string YearInvalid = "TRIP_001";
+        #endregion
+
         #region Verification
         public const string CodeInvalid = "VER_001";
         public const string CodeExpired = "VER_002";
         public const string AttemptsExceeded = "VER_003";
-        #endregion
-
-        #region Trip
-        public const string YearInvalid = "TRIP_001";
         #endregion
 
         #region Ban / Report

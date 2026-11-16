@@ -1023,8 +1023,8 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
-            await Assert.That(result.Message).IsEqualTo("Invalid email or token.");
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.CodeInvalid);
+            await Assert.That(result.Message).IsEqualTo("The verification code is invalid.");
         }
 
         [Test]
@@ -1042,9 +1042,9 @@ namespace Tests.Services
             var result = await Sut.ConfirmRegisterAsync(command);
 
             // Assert
-            await Assert.That(result.IsSuccess).IsTrue();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            await Assert.That(result.Message).IsEqualTo("Email is already confirmed.");
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.Message).IsEqualTo("The verification code is invalid.");
         }
 
         [Test]
@@ -1077,8 +1077,8 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
-            await Assert.That(result.Message).IsEqualTo("Invalid email or token.");
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.CodeInvalid);
+            await Assert.That(result.Message).IsEqualTo("The verification code is invalid.");
         }
 
         [Test]
@@ -1110,8 +1110,8 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
-            await Assert.That(result.Message).IsEqualTo("Verification code has expired. Please request a new verification code.");
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.CodeInvalid);
+            await Assert.That(result.Message).IsEqualTo("The verification code is invalid.");
 
             Context.ChangeTracker.Clear();
 
@@ -1156,8 +1156,8 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
-            await Assert.That(result.Message).IsEqualTo("Invalid verification code.");
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.CodeInvalid);
+            await Assert.That(result.Message).IsEqualTo("The verification code is invalid.");
 
             Context.ChangeTracker.Clear();
 
@@ -1199,7 +1199,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.CodeInvalid);
 
             Context.ChangeTracker.Clear();
 
@@ -1240,9 +1240,9 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status429TooManyRequests);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.AccountLocked);
-            await Assert.That(result.Message).IsEqualTo("Maximum verification attempts reached. Please request a new verification code.");
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.CodeInvalid);
+            await Assert.That(result.Message).IsEqualTo("The verification code is invalid.");
 
             Context.ChangeTracker.Clear();
 

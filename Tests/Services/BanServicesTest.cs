@@ -194,7 +194,7 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status201Created);
             await Assert.That(result.Message).IsEqualTo("User reported successfully.");
         }
 

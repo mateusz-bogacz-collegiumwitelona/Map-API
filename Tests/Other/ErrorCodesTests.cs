@@ -42,20 +42,21 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.UserNotFound).IsEqualTo("USR_008");
             #endregion
 
-            #region Trip
-            await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
-            #endregion
-
             #region Verification
             await Assert.That(ErrorCodes.CodeInvalid).IsEqualTo("VER_001");
             await Assert.That(ErrorCodes.CodeExpired).IsEqualTo("VER_002");
             await Assert.That(ErrorCodes.AttemptsExceeded).IsEqualTo("VER_003");
             #endregion
 
+            #region Trip
+            await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
+            #endregion
+
             #region Ban / Report
             await Assert.That(ErrorCodes.ReportEmpty).IsEqualTo("BAN_001");
             await Assert.That(ErrorCodes.ReportTooLong).IsEqualTo("BAN_002");
             await Assert.That(ErrorCodes.ReportTooShort).IsEqualTo("BAN_003");
+            await Assert.That(ErrorCodes.ReportNotFound).IsEqualTo("BAN_004");
             #endregion
         }
 
@@ -79,6 +80,7 @@ namespace Tests.Other
                 #endregion
 
                 #region Common
+
                 ErrorCodes.InvalidOperation,
                 ErrorCodes.NotFound,
                 ErrorCodes.BadRequest,
@@ -113,6 +115,7 @@ namespace Tests.Other
                 ErrorCodes.ReportEmpty,
                 ErrorCodes.ReportTooLong,
                 ErrorCodes.ReportTooShort,
+                ErrorCodes.ReportNotFound,
                 #endregion
             };
 

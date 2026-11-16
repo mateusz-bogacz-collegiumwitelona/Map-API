@@ -299,47 +299,35 @@ namespace Services.Services
 
             var user = await _userManager.FindByEmailAsync(command.Email);
 
-            if (user == null)
+            if (user == null || user.EmailConfirmed)
             {
-                _logger.LogWarning("Email confirmation attempt failed for non-existent user with email: {Email}", command.Email);
-                return Result.Failure(
-                    message: "Invalid email or token.",
-                    errorCode: ErrorCodes.InvalidCredentials,
-                    statusCode: StatusCodes.Status400BadRequest);
-            }
+                CodesMatch(new string('0', VerificationConst.CodeLength), command.Code ?? string.Empty);
 
-            if (user.EmailConfirmed)
-            {
-                _logger.LogInformation("Email confirmation attempt for already confirmed email: {Email}", command.Email);
-                return Result.Success(
-                    message: "Email is already confirmed.",
-                    statusCode: StatusCodes.Status200OK
-                    );
+                _logger.LogWarning(
+                    "Email confirmation failed for {Email}. Reason: {Reason}",
+                    command.Email,
+                    user == null ? "User not found" : "Email already confirmed");
+
+                return CodeInvalid();
             }
 
             var verificationCode = await _context.EmailVerificationCodes
-                .Where(c => c.UserId == user.Id && !c.IsUsed)
+                .Where(c => c.UserId == user.Id
+                    && c.Purpose == VerificationPurposeEnum.Registration
+                    && !c.IsUsed)
                 .OrderByDescending(c => c.CreatedAt)
                 .FirstOrDefaultAsync(token);
 
             if (verificationCode == null)
             {
-                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. No verification code found.", command.Email);
-                return Result.Failure(
-                    message: "Invalid email or token.",
-                    errorCode: ErrorCodes.InvalidCredentials,
-                    statusCode: StatusCodes.Status400BadRequest);
+                _logger.LogWarning("Email confirmation failed for {Email}. No active verification code found.", command.Email);
+                return CodeInvalid();
             }
-
 
             if (verificationCode.AttemptsCount >= VerificationConst.MaxAttempts)
             {
-
-                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Maximum attempts reached.", command.Email);
-                return Result.Failure(
-                    message: "Maximum verification attempts reached. Please request a new verification code.",
-                    errorCode: ErrorCodes.AccountLocked,
-                    statusCode: StatusCodes.Status429TooManyRequests);
+                _logger.LogWarning("Email confirmation failed for {Email}. Maximum attempts reached.", command.Email);
+                return CodeInvalid();
             }
 
             if (verificationCode.ExpiredAt < DateTime.UtcNow)
@@ -347,24 +335,17 @@ namespace Services.Services
                 verificationCode.IsUsed = true;
                 await _context.SaveChangesAsync(token);
 
-                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Verification code expired.", command.Email);
-                return Result.Failure(
-                    message: "Verification code has expired. Please request a new verification code.",
-                    errorCode: ErrorCodes.InvalidCredentials,
-                    statusCode: StatusCodes.Status400BadRequest);
+                _logger.LogWarning("Email confirmation failed for {Email}. Verification code expired.", command.Email);
+                return CodeInvalid();
             }
 
             if (!CodesMatch(verificationCode.Code, command.Code))
             {
                 verificationCode.AttemptsCount++;
-
                 await _context.SaveChangesAsync(token);
 
-                _logger.LogWarning("Email confirmation attempt failed for user with email: {Email}. Invalid verification code.", command.Email);
-                return Result.Failure(
-                    message: "Invalid verification code.",
-                    errorCode: ErrorCodes.InvalidCredentials,
-                    statusCode: StatusCodes.Status400BadRequest);
+                _logger.LogWarning("Email confirmation failed for {Email}. Invalid code.", command.Email);
+                return CodeInvalid();
             }
 
             await using var transaction = await _context.Database.BeginTransactionAsync(token);
@@ -387,9 +368,7 @@ namespace Services.Services
             _logger.LogInformation("Email confirmed successfully for user with email: {Email}", command.Email);
             return Result.Success(
                 message: "Email confirmed successfully.",
-                statusCode: StatusCodes.Status200OK
-                );
-
+                statusCode: StatusCodes.Status200OK);
         }
 
         public async Task<Result> ResendEmailVerificationCodeAsync(ResendVerificationCodeCommand command, CancellationToken ct = default)

@@ -7,7 +7,7 @@ namespace Tests.Validators.List
 {
     public class ReportListValidatorTest
     {
-        private readonly BasicListValidator _validator = new();
+        private readonly ReportListValidator _validator = new();
 
         [Test]
         public async Task Validate_WhenAllFieldsAreNull_ShouldNotHaveAnyValidationErrors()

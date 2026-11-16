@@ -4,7 +4,7 @@ using FluentValidation;
 
 namespace Api.Validators.Validators.List
 {
-    public class BasicListValidator : AbstractValidator<ReportListRequest>
+    public class BasicListValidator : AbstractValidator<BasicListRequest>
     {
         public BasicListValidator()
         {
