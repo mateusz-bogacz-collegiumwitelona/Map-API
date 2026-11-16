@@ -10,6 +10,7 @@ namespace Api.Validators.Validators.List
         {
             RuleFor(x => x.PageNumber).ApplyPageNumberRules();
             RuleFor(x => x.PageSize).ApplyPageSizeRules();
+            RuleFor(x => x.SearchTerm).ApplySearchTermRules();
         }
     }
 }

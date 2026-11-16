@@ -19,5 +19,12 @@ namespace Api.Validators.Rule
                     .WithErrorCode(errorCode)
                     .LessThanOrEqualTo(100)
                     .WithErrorCode(errorCode);
+
+        public static IRuleBuilderOptions<T, string?> ApplySearchTermRules<T>(
+            this IRuleBuilder<T, string?> ruleBuilder,
+            string errorCode = ErrorCodes.ValidationError)
+                => ruleBuilder
+                    .MaximumLength(100)
+                    .WithErrorCode(errorCode);
     }
 }

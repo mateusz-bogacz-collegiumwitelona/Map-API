@@ -83,5 +83,32 @@ namespace Tests.Validators.List
             result.ShouldHaveValidationErrorFor(x => x.PageSize)
                   .WithErrorCode(ErrorCodes.PageSizeInvalid);
         }
+
+        [Test]
+        public async Task Validate_WhenSearchTermIsWithinMaxLength_ShouldNotHaveValidationError()
+        {
+            // Arrange
+            var request = new BasicListRequest { SearchTerm = new string('a', 100) };
+
+            // Act
+            var result = await _validator.TestValidateAsync(request);
+
+            // Assert
+            result.ShouldNotHaveValidationErrorFor(x => x.SearchTerm);
+        }
+
+        [Test]
+        public async Task Validate_WhenSearchTermExceedsMaxLength_ShouldHaveValidationError()
+        {
+            // Arrange
+            var request = new BasicListRequest { SearchTerm = new string('a', 101) };
+
+            // Act
+            var result = await _validator.TestValidateAsync(request);
+
+            // Assert
+            result.ShouldHaveValidationErrorFor(x => x.SearchTerm)
+                  .WithErrorCode(ErrorCodes.ValidationError);
+        }
     }
 }
