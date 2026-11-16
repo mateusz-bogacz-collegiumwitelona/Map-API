@@ -147,5 +147,88 @@ namespace Tests.Mappers
         }
 
         #endregion
+
+        #region Resolve Mapping Tests
+
+        [Test]
+        public async Task ToResolve_WithTemporaryBan_MapsAllProperties()
+        {
+            // Arrange
+            var duration = TimeSpan.FromDays(7);
+            var request = new ResolveReportRequest
+            {
+                Id = Guid.NewGuid(),
+                IsBanned = true,
+                Duration = duration
+            };
+
+            // Act
+            var command = _mapper.ToResolve(request);
+
+            // Assert
+            await Assert.That(command.Id).IsEqualTo(request.Id);
+            await Assert.That(command.IsBanned).IsTrue();
+            await Assert.That(command.Duration).IsEqualTo(duration);
+        }
+
+        [Test]
+        public async Task ToResolve_WithPermanentBan_MapsNullDuration()
+        {
+            // Arrange
+            var request = new ResolveReportRequest
+            {
+                Id = Guid.NewGuid(),
+                IsBanned = true,
+                Duration = null
+            };
+
+            // Act
+            var command = _mapper.ToResolve(request);
+
+            // Assert
+            await Assert.That(command.Id).IsEqualTo(request.Id);
+            await Assert.That(command.IsBanned).IsTrue();
+            await Assert.That(command.Duration).IsNull();
+        }
+
+        [Test]
+        public async Task ToResolve_WhenRejected_MapsIsBannedFalseAndNullDuration()
+        {
+            // Arrange
+            var request = new ResolveReportRequest
+            {
+                Id = Guid.NewGuid(),
+                IsBanned = false,
+                Duration = null
+            };
+
+            // Act
+            var command = _mapper.ToResolve(request);
+
+            // Assert
+            await Assert.That(command.Id).IsEqualTo(request.Id);
+            await Assert.That(command.IsBanned).IsFalse();
+            await Assert.That(command.Duration).IsNull();
+        }
+
+        [Test]
+        public async Task ToResolve_DoesNotModifyEmptyId()
+        {
+            // Arrange
+            var request = new ResolveReportRequest
+            {
+                Id = Guid.Empty,
+                IsBanned = false,
+                Duration = null
+            };
+
+            // Act
+            var command = _mapper.ToResolve(request);
+
+            // Assert
+            await Assert.That(command.Id).IsEqualTo(Guid.Empty);
+        }
+
+        #endregion
     }
 }

@@ -10,5 +10,7 @@ namespace Api.Mappers
     {
         [MapProperty(nameof(ReportUserRequest.Reason), nameof(ReportUserCommand.Reason), Use = nameof(Trim))]
         public partial ReportUserCommand ToReport(ReportUserRequest request);
+
+        public partial ResolveReportCommand ToResolve(ResolveReportRequest request);
     }
 }

@@ -16,5 +16,8 @@ namespace Domain.Models
         public DateTime? DeletedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
+
+        public bool HasActiveBan() =>
+            IsBanned && (!BannedUntil.HasValue || BannedUntil.Value > DateTime.UtcNow);
     }
 }

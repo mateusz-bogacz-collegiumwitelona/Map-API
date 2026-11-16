@@ -4,8 +4,11 @@ using Domain.Models;
 using Infrastructure;
 using Infrastructure.Interceptors;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Services.Command.Ban;
 using Services.Command.List;
@@ -25,6 +28,8 @@ namespace Tests.Services
 
         private IBanServices _sut = null!;
         private string _currentSchema = null!;
+
+        private UserManager<User> _userManager = null!;
 
         [Before(Class)]
         public static async Task SetupClassAsync()
@@ -87,10 +92,24 @@ namespace Tests.Services
             var createScript = _context.Database.GenerateCreateScript();
             await _context.Database.ExecuteSqlRawAsync(createScript);
 
+            var userStore = new UserStore<User, IdentityRole<Guid>, AppDbContext, Guid>(_context);
+            _userManager = new UserManager<User>(
+                userStore,
+                Options.Create(new IdentityOptions()),
+                new PasswordHasher<User>(),
+                Array.Empty<IUserValidator<User>>(),
+                Array.Empty<IPasswordValidator<User>>(),
+                new UpperInvariantLookupNormalizer(),
+                new IdentityErrorDescriber(),
+                null!,
+                new LoggerFactory().CreateLogger<UserManager<User>>());
+
             _sut = new BanServices(
                 _context,
                 new LoggerFactory().CreateLogger<BanServices>(),
-                new FakeCancellationTokenAccessor());
+                new FakeCancellationTokenAccessor(),
+                _userManager 
+                );
         }
 
         [After(Test)]
@@ -105,13 +124,31 @@ namespace Tests.Services
             await cmd.ExecuteNonQueryAsync();
         }
 
-        private async Task<User> AddUserAsync(string firstName = "Jan", string lastName = "Kowalski")
+        private async Task<User> AddUserAsync(
+            string firstName = "Jan",
+            string lastName = "Kowalski",
+            bool isBanned = false,
+            DateTime? bannedUntil = null,
+            string? bannedReason = null)
         {
+            var id = Guid.NewGuid();
             var user = new User
             {
-                Id = Guid.NewGuid(),
+                Id = id,
+                UserName = $"user_{id:N}",
+                NormalizedUserName = $"USER_{id:N}",
+                Email = $"user_{id:N}@example.com",
+                NormalizedEmail = $"USER_{id:N}@EXAMPLE.COM",
+                SecurityStamp = Guid.NewGuid().ToString(),
+                LockoutEnabled = true,
                 FirstName = firstName,
-                LastName = lastName
+                LastName = lastName,
+                IsBanned = isBanned,
+                BannedUntil = bannedUntil,
+                BannedReason = bannedReason,
+                LockoutEnd = isBanned
+                    ? (bannedUntil.HasValue ? new DateTimeOffset(bannedUntil.Value, TimeSpan.Zero) : DateTimeOffset.MaxValue)
+                    : null
             };
 
             _context.Users.Add(user);
@@ -119,6 +156,17 @@ namespace Tests.Services
 
             return user;
         }
+
+        private static ResolveReportCommand CreateResolveCommand(
+            Guid reportId,
+            bool isBanned = false,
+            TimeSpan? duration = null)
+            => new ResolveReportCommand
+            {
+                Id = reportId,
+                IsBanned = isBanned,
+                Duration = duration
+            };
 
         private static ReportUserCommand CreateCommand(Guid reportedUserId, string reason = "Spam")
             => new ReportUserCommand
@@ -955,6 +1003,209 @@ namespace Tests.Services
             await Assert.That(first.Data!.Items.Single().Id).IsEqualTo(oldest.Id);
             await Assert.That(last.Data!.Items.Single().Id).IsEqualTo(newest.Id);
         }
+        #endregion
+
+        #region ResolveReportAsync
+
+        [Test]
+        public async Task ResolveReportAsync_WhenReportDoesNotExist_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var command = CreateResolveCommand(Guid.NewGuid(), isBanned: false);
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.ReportNotFound);
+            await Assert.That(result.Message).IsEqualTo("Report does not exist.");
+        }
+
+        [Test]
+        [Arguments(ReportStatusEnum.Approved)]
+        [Arguments(ReportStatusEnum.Rejected)]
+        public async Task ResolveReportAsync_WhenReportIsAlreadyResolved_ShouldReturnBadRequestFailure(ReportStatusEnum existingStatus)
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var report = await AddReportAsync(reported, reporter, status: existingStatus, resolvedAt: BaseDate);
+
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: TimeSpan.FromDays(1));
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.ReportAlreadyResolved);
+            await Assert.That(result.Message).IsEqualTo("Report has already been resolved.");
+        }
+
+        [Test]
+        public async Task ResolveReportAsync_WhenIsBannedIsFalse_ShouldRejectReportAndNotBanUser()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var report = await AddReportAsync(reported, reporter, reason: "False accusation");
+
+            var beforeResolve = DateTime.UtcNow;
+            var command = CreateResolveCommand(report.Id, isBanned: false);
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("Report resolved successfully.");
+
+            var updatedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == report.Id);
+            await Assert.That(updatedReport.Status).IsEqualTo(ReportStatusEnum.Rejected);
+            await Assert.That(updatedReport.ResolvedByAdminId).IsEqualTo(admin.Id);
+            await Assert.That(updatedReport.ResolvedAt).IsNotNull();
+            await Assert.That(updatedReport.ResolvedAt!.Value).IsGreaterThanOrEqualTo(beforeResolve);
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == reported.Id);
+            await Assert.That(updatedUser.IsBanned).IsFalse();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsNull();
+            await Assert.That(updatedUser.LockoutEnd).IsNull();
+        }
+
+        [Test]
+        public async Task ResolveReportAsync_WhenIsBannedIsTrueAndDurationIsNull_ShouldApproveReportAndApplyPermanentBan()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var initialSecurityStamp = reported.SecurityStamp;
+            var report = await AddReportAsync(reported, reporter, reason: "Severe harassment");
+
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: null);
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+
+            var updatedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == report.Id);
+            await Assert.That(updatedReport.Status).IsEqualTo(ReportStatusEnum.Approved);
+            await Assert.That(updatedReport.ResolvedByAdminId).IsEqualTo(admin.Id);
+            await Assert.That(updatedReport.ResolvedAt).IsNotNull();
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == reported.Id);
+            await Assert.That(updatedUser.IsBanned).IsTrue();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsEqualTo("Severe harassment");
+            await Assert.That(updatedUser.LockoutEnabled).IsTrue();
+            await Assert.That(updatedUser.LockoutEnd).IsEqualTo(DateTimeOffset.MaxValue);
+            await Assert.That(updatedUser.SecurityStamp).IsNotEqualTo(initialSecurityStamp);
+        }
+
+        [Test]
+        public async Task ResolveReportAsync_WhenIsBannedIsTrueAndDurationIsProvided_ShouldApproveReportAndApplyTemporaryBan()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var report = await AddReportAsync(reported, reporter, reason: "Spam links");
+
+            var duration = TimeSpan.FromDays(7);
+            var beforeBan = DateTime.UtcNow;
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: duration);
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var updatedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == report.Id);
+            await Assert.That(updatedReport.Status).IsEqualTo(ReportStatusEnum.Approved);
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == reported.Id);
+            await Assert.That(updatedUser.IsBanned).IsTrue();
+            await Assert.That(updatedUser.BannedReason).IsEqualTo("Spam links");
+            await Assert.That(updatedUser.BannedUntil).IsNotNull();
+            await Assert.That(updatedUser.BannedUntil!.Value).IsGreaterThanOrEqualTo(beforeBan.Add(duration));
+            await Assert.That(updatedUser.BannedUntil!.Value).IsLessThanOrEqualTo(DateTime.UtcNow.Add(duration));
+            await Assert.That(updatedUser.LockoutEnd).IsNotNull();
+        }
+
+        [Test]
+        public async Task ResolveReportAsync_WhenReportedUserAlreadyHasActiveBan_ShouldReturnBadRequestAndKeepReportPending()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync(
+                "Anna",
+                "Nowak",
+                isBanned: true,
+                bannedUntil: DateTime.UtcNow.AddDays(3),
+                bannedReason: "Previous violation");
+            var report = await AddReportAsync(reported, reporter, reason: "New violation");
+
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: TimeSpan.FromDays(7));
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserAlreadyBanned);
+            await Assert.That(result.Message).IsEqualTo("Reported user is already banned.");
+
+            var unchangedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == report.Id);
+            await Assert.That(unchangedReport.Status).IsEqualTo(ReportStatusEnum.Pending);
+            await Assert.That(unchangedReport.ResolvedByAdminId).IsNull();
+            await Assert.That(unchangedReport.ResolvedAt).IsNull();
+        }
+
+        [Test]
+        public async Task ResolveReportAsync_WhenReportedUserHadExpiredBan_ShouldAllowNewBan()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync(
+                "Anna",
+                "Nowak",
+                isBanned: true,
+                bannedUntil: DateTime.UtcNow.AddDays(-1), // ban już wygasł
+                bannedReason: "Old expired ban");
+            var report = await AddReportAsync(reported, reporter, reason: "Repeat offense");
+
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: TimeSpan.FromDays(14));
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var updatedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == report.Id);
+            await Assert.That(updatedReport.Status).IsEqualTo(ReportStatusEnum.Approved);
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == reported.Id);
+            await Assert.That(updatedUser.IsBanned).IsTrue();
+            await Assert.That(updatedUser.BannedReason).IsEqualTo("Repeat offense");
+            await Assert.That(updatedUser.BannedUntil!.Value).IsGreaterThan(DateTime.UtcNow);
+        }
+
         #endregion
     }
 }

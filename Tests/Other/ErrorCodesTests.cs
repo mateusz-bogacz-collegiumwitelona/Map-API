@@ -57,6 +57,11 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.ReportTooLong).IsEqualTo("BAN_002");
             await Assert.That(ErrorCodes.ReportTooShort).IsEqualTo("BAN_003");
             await Assert.That(ErrorCodes.ReportNotFound).IsEqualTo("BAN_004");
+            await Assert.That(ErrorCodes.ReportAlreadyResolved).IsEqualTo("BAN_005");
+            await Assert.That(ErrorCodes.UserAlreadyBanned).IsEqualTo("BAN_006");
+            await Assert.That(ErrorCodes.BanDurationInvalid).IsEqualTo("BAN_007");
+            await Assert.That(ErrorCodes.BanDurationNotAllowed).IsEqualTo("BAN_008");
+
             #endregion
         }
 
@@ -116,6 +121,10 @@ namespace Tests.Other
                 ErrorCodes.ReportTooLong,
                 ErrorCodes.ReportTooShort,
                 ErrorCodes.ReportNotFound,
+                ErrorCodes.ReportAlreadyResolved,
+                ErrorCodes.UserAlreadyBanned,
+                ErrorCodes.BanDurationInvalid,
+                ErrorCodes.BanDurationNotAllowed,
                 #endregion
             };
 

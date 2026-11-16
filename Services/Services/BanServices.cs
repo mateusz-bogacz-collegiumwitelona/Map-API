@@ -1,8 +1,11 @@
 ﻿using Domain.Common;
 using Domain.Const;
+using Domain.Exceptions;
 using Domain.Models;
+using Domain.State;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
@@ -20,17 +23,20 @@ namespace Services.Services
         private readonly AppDbContext _context;
         private readonly ILogger<BanServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+        private readonly UserManager<User> _userManager;
 
         private CancellationToken _ct => _ctAccessor.Token;
 
         public BanServices(
             AppDbContext context,
             ILogger<BanServices> logger,
-            ICancellationTokenAccessor ctAccessor)
+            ICancellationTokenAccessor ctAccessor,
+            UserManager<User> userManager)
         {
             _context = context;
             _logger = logger;
             _ctAccessor = ctAccessor;
+            _userManager = userManager;
         }
 
         public async Task<Result> ReportUserAsync(ReportUserCommand command, Guid currentUserId)
@@ -89,7 +95,6 @@ namespace Services.Services
                     ResolvedAt = ur.ResolvedAt
                 })
             .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Reports", _ct);
-
         public async Task<Result<ReportDetailResponse>> GetReportDetailAsync(Guid id)
         {
             var report = await _context.UserReports
@@ -136,6 +141,101 @@ namespace Services.Services
                 message: "Report details retrieved successfully.",
                 data: report,
                 statusCode: StatusCodes.Status200OK);
+        }
+
+        public async Task<Result> ResolveReportAsync(ResolveReportCommand command, Guid adminId)
+        {
+            var report = await _context.UserReports
+                .Include(ur => ur.ReportedUser)
+                .FirstOrDefaultAsync(ur => ur.Id == command.Id, _ct);
+
+            if (report == null)
+            {
+                _logger.LogWarning("Admin with id {adminId} want resolve report with id {reportId} with dosn't exist.", 
+                    adminId, command.Id);
+                return Result.Failure(
+                    message: "Report does not exist.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: ErrorCodes.ReportNotFound
+                    );
+            }
+
+            var stateMachine = new UserReportStateMachine(report);
+
+            if (!stateMachine.CanReject() || !stateMachine.CanApprove())
+            {
+                _logger.LogWarning("Admin with id {adminId} want resolve report with id {reportId} with is resolved.",
+                    adminId, command.Id);
+
+                return Result.Failure(
+                    message: "Report has already been resolved.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: ErrorCodes.ReportAlreadyResolved
+                );
+            }
+
+            if (!command.IsBanned)
+            {
+                stateMachine.Reject(adminId);
+            } 
+            else
+            {
+                if (report.ReportedUser.HasActiveBan())
+                {
+                    _logger.LogWarning("Admin with id {adminId} want ban user with id {userId} with is banned now.",
+                        adminId, report.ReportedUserId);
+                    return Result.Failure(
+                        message: "Reported user is already banned.",
+                        statusCode: StatusCodes.Status400BadRequest,
+                        errorCode: ErrorCodes.UserAlreadyBanned
+                    );
+                }
+
+                stateMachine.Approve(adminId);
+
+                var banResult = await ApplyBanAsync(report.ReportedUser, command.Duration, report.Reason);
+
+                if (!banResult.Succeeded)
+                {
+                    _logger.LogError("Failed to ban user {UserId} for report {ReportId}", report.ReportedUserId, report.Id);
+                    throw new InternalServerException("Failed to ban reported user.");
+                }
+            }
+
+            await _context.SaveChangesAsync(_ct);
+
+            return Result.Success(
+                message: "Report resolved successfully.",
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
+        private async Task<IdentityResult> ApplyBanAsync(User user, TimeSpan? duration, string reason)
+        {
+            if (!user.LockoutEnabled)
+            {
+                await _userManager.SetLockoutEnabledAsync(user, true);
+            }
+
+            DateTime? bannedUntil = duration.HasValue
+                ? DateTime.UtcNow.Add(duration.Value)
+                : null;
+
+            DateTimeOffset lockoutEnd = bannedUntil.HasValue
+                ? new DateTimeOffset(bannedUntil.Value, TimeSpan.Zero)
+                : DateTimeOffset.MaxValue;
+
+            user.IsBanned = true;
+            user.BannedUntil = bannedUntil;
+            user.BannedReason = reason;
+
+            var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
+            if (result.Succeeded)
+            {
+                await _userManager.UpdateSecurityStampAsync(user);
+            }
+
+            return result;
         }
     }
 }

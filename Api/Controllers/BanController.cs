@@ -61,5 +61,22 @@ namespace Api.Controllers
             var result = await ban.GetReportDetailAsync(id);
             return HandleResult(result);
         }
+
+        [EndpointSummary("Resolve user report")]
+        [EndpointDescription("Resolves a pending user report by either rejecting it or approving it and banning the reported user. " +
+            "Set 'isBanned' to false to reject the report, or true to approve it and apply a ban (leave 'duration' null for a permanent ban, or specify a TimeSpan for a temporary ban). " +
+            "Returns 200 when the report is successfully resolved, or 400 if the report does not exist, has already been resolved, the reported user is already banned, or validation fails.")]
+        [HttpPost("report/resolve")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ResolveReportAsync(
+            [FromServices] IBanServices ban,
+            [FromServices] BanMapper mapper,
+            [FromBody] ResolveReportRequest request
+            )
+        {
+            var result = await ban.ResolveReportAsync(mapper.ToResolve(request), CurrentUserId);
+            return HandleResult(result);
+        }
     }
 }

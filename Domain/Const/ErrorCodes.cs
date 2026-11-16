@@ -55,6 +55,10 @@
         public const string ReportTooLong = "BAN_002";
         public const string ReportTooShort = "BAN_003";
         public const string ReportNotFound = "BAN_004";
+        public const string ReportAlreadyResolved = "BAN_005";
+        public const string UserAlreadyBanned = "BAN_006";
+        public const string BanDurationInvalid = "BAN_007";
+        public const string BanDurationNotAllowed = "BAN_008";
         #endregion
     }
 }
