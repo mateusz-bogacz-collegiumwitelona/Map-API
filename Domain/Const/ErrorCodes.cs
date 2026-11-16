@@ -59,6 +59,7 @@
         public const string UserAlreadyBanned = "BAN_006";
         public const string BanDurationInvalid = "BAN_007";
         public const string BanDurationNotAllowed = "BAN_008";
+        public const string UserNotBanned = "BAN_009";
         #endregion
     }
 }

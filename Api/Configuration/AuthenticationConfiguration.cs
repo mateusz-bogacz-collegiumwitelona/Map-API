@@ -1,3 +1,5 @@
+using Domain.Common;
+using Domain.Const;
 using Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +11,8 @@ namespace Api.Configuration
 {
     public static class AuthenticationConfiguration
     {
+        private const string AccountBannedItemKey = "AccountBanned";
+
         public static IServiceCollection AddAuthenticationConfiguration(
             this IServiceCollection services,
             IConfiguration configuration)
@@ -22,12 +26,12 @@ namespace Api.Configuration
             }
 
             services.AddAuthentication(options =>
-                {
-                    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-                    options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
-                })
+            {
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
                 .AddJwtBearer(options =>
                 {
                     options.TokenValidationParameters = new TokenValidationParameters
@@ -44,7 +48,8 @@ namespace Api.Configuration
 
                     options.Events = new JwtBearerEvents
                     {
-                        OnTokenValidated = ValidateUserIsActiveAsync
+                        OnTokenValidated = ValidateUserIsActiveAsync,
+                        OnChallenge = HandleChallengeAsync
                     };
                 });
 
@@ -63,13 +68,42 @@ namespace Api.Configuration
 
             var dbContext = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
 
-            var isActive = await dbContext.Users
+            var now = DateTime.UtcNow;
+            var userStatus = await dbContext.Users
                 .AsNoTracking()
-                .AnyAsync(u => u.Id == parsedUserId, context.HttpContext.RequestAborted);
+                .Where(u => u.Id == parsedUserId)
+                .Select(u => new
+                {
+                    IsBanned = u.IsBanned && (u.BannedUntil == null || u.BannedUntil > now)
+                })
+                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
 
-            if (!isActive)
+            if (userStatus is null)
             {
                 context.Fail("User account no longer exists.");
+                return;
+            }
+
+            if (userStatus.IsBanned)
+            {
+                context.HttpContext.Items[AccountBannedItemKey] = true;
+                context.Fail("User account is banned.");
+            }
+        }
+
+        public static async Task HandleChallengeAsync(JwtBearerChallengeContext context)
+        {
+            if (context.HttpContext.Items.ContainsKey(AccountBannedItemKey))
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+                await context.Response.WriteAsJsonAsync(
+                    Result.Failure(
+                        message: "Account is banned.",
+                        errorCode: ErrorCodes.AccountBanned,
+                        statusCode: StatusCodes.Status403Forbidden),
+                    context.HttpContext.RequestAborted);
             }
         }
     }

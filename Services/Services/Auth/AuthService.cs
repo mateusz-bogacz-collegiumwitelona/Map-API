@@ -51,6 +51,12 @@ namespace Services.Services.Auth
                 return InvalidCredentials();
             }
 
+            if (user.HasActiveBan())
+            {
+                _logger.LogWarning("Login attempt failed for banned user with email: {Email}", command.Email);
+                return AccountBanned();
+            }
+
             if (await _userManager.IsLockedOutAsync(user))
             {
                 _logger.LogWarning("Login attempt failed for locked out user with email: {Email}", command.Email);
@@ -103,7 +109,7 @@ namespace Services.Services.Auth
                 return InvalidRefreshToken();
             }
 
-            if (IsBanned(consumedToken.User))
+            if (consumedToken.User.HasActiveBan())
             {
                 _logger.LogWarning("Refresh token attempt failed for banned user with ID: {UserId}", consumedToken.User.Id);
                 await _tokenService.RevokeAllUserRefreshTokensAsync(consumedToken.User.Id, token);
