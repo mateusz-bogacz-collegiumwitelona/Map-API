@@ -1378,5 +1378,146 @@ namespace Tests.Services
         }
 
         #endregion
+
+        #region BanUserAsync
+
+        [Test]
+        public async Task BanUserAsync_WhenAdminTriesToBanThemselves_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var command = new BanUserCommand
+            {
+                UserId = admin.Id,
+                Reason = "Self ban test",
+                Duration = TimeSpan.FromDays(1)
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidOperation);
+            await Assert.That(result.Message).IsEqualTo("You cannot ban yourself.");
+        }
+
+        [Test]
+        public async Task BanUserAsync_WhenUserDoesNotExist_ShouldReturnNotFoundFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var command = new BanUserCommand
+            {
+                UserId = Guid.NewGuid(),
+                Reason = "Spam",
+                Duration = null
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+        }
+
+        [Test]
+        public async Task BanUserAsync_WhenUserAlreadyHasActiveBan_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var target = await AddUserAsync(
+                "Anna",
+                "Nowak",
+                isBanned: true,
+                bannedUntil: DateTime.UtcNow.AddDays(5),
+                bannedReason: "Existing ban");
+
+            var command = new BanUserCommand
+            {
+                UserId = target.Id,
+                Reason = "Another reason",
+                Duration = TimeSpan.FromDays(10)
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserAlreadyBanned);
+        }
+
+        [Test]
+        public async Task BanUserAsync_WithTemporaryDuration_ShouldBanUserAndApprovePendingReports()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var target = await AddUserAsync("Anna", "Nowak");
+            var pendingReport = await AddReportAsync(target, reporter, reason: "Pending spam report");
+
+            var duration = TimeSpan.FromDays(3);
+            var beforeBan = DateTime.UtcNow;
+            var command = new BanUserCommand
+            {
+                UserId = target.Id,
+                Reason = "Direct ban for spam",
+                Duration = duration
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("User banned successfully.");
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == target.Id);
+            await Assert.That(updatedUser.IsBanned).IsTrue();
+            await Assert.That(updatedUser.BannedReason).IsEqualTo("Direct ban for spam");
+            await Assert.That(updatedUser.BannedUntil).IsNotNull();
+            await Assert.That(updatedUser.BannedUntil!.Value).IsGreaterThanOrEqualTo(beforeBan.Add(duration));
+            await Assert.That(updatedUser.LockoutEnd).IsNotNull();
+
+            var updatedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == pendingReport.Id);
+            await Assert.That(updatedReport.Status).IsEqualTo(ReportStatusEnum.Approved);
+            await Assert.That(updatedReport.ResolvedByAdminId).IsEqualTo(admin.Id);
+            await Assert.That(updatedReport.ResolvedAt).IsNotNull();
+        }
+
+        [Test]
+        public async Task BanUserAsync_WithNullDuration_ShouldApplyPermanentBan()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var target = await AddUserAsync("Anna", "Nowak");
+
+            var command = new BanUserCommand
+            {
+                UserId = target.Id,
+                Reason = "Permanent ban",
+                Duration = null
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == target.Id);
+            await Assert.That(updatedUser.IsBanned).IsTrue();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsEqualTo("Permanent ban");
+            await Assert.That(updatedUser.LockoutEnd).IsEqualTo(DateTimeOffset.MaxValue);
+        }
+
+        #endregion
     }
 }

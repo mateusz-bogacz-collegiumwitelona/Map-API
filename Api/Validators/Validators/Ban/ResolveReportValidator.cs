@@ -13,11 +13,7 @@ namespace Api.Validators.Validators.Ban
 
             When(x => x.Duration != null, () =>
             {
-                RuleFor(x => x.Duration)
-                    .GreaterThan(TimeSpan.Zero)
-                    .WithErrorCode(ErrorCodes.BanDurationInvalid)
-                    .LessThanOrEqualTo(TimeSpan.FromDays(365))
-                    .WithErrorCode(ErrorCodes.BanDurationInvalid);
+                RuleFor(x => x.Duration).ApplyBanDurationRules();
             });
 
             When(x => !x.IsBanned, () =>

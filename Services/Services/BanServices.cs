@@ -202,17 +202,7 @@ namespace Services.Services
                     throw new InternalServerException("Failed to ban reported user.");
                 }
 
-                var otherPendingReports = await _context.UserReports
-                    .Where(ur => ur.ReportedUserId == report.ReportedUserId
-                              && ur.Id != report.Id
-                              && ur.Status == ReportStatusEnum.Pending)
-                    .ToListAsync(_ct);
-
-                foreach (var otherReport in otherPendingReports)
-                {
-                    var otherStateMachine = new UserReportStateMachine(otherReport);
-                    otherStateMachine.Approve(adminId);
-                }
+                await ApprovePendingReportsForUserAsync(report.ReportedUserId, adminId, excludeReportId: report.Id);
             }
 
             await _context.SaveChangesAsync(_ct);
@@ -268,6 +258,62 @@ namespace Services.Services
             );
         }
 
+        public async Task<Result> BanUserAsync(BanUserCommand command, Guid adminId)
+        {
+            if (command.UserId == adminId)
+            {
+                _logger.LogWarning("Admin with id {AdminId} attempted to ban themselves.", adminId);
+                return Result.Failure(
+                    message: "You cannot ban yourself.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: ErrorCodes.InvalidOperation
+                );
+            }
+
+            var user = await _userManager.FindByIdAsync(command.UserId.ToString());
+
+            if (user == null)
+            {
+                _logger.LogWarning("Admin with id {AdminId} tried to ban non-existent user with id {UserId}.",
+                    adminId, command.UserId);
+                return Result.Failure(
+                    message: "User does not exist.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.UserNotFound
+                );
+            }
+
+            if (user.HasActiveBan())
+            {
+                _logger.LogWarning("Admin with id {AdminId} tried to ban user with id {UserId} who is already banned.",
+                    adminId, command.UserId);
+                return Result.Failure(
+                    message: "User is already banned.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: ErrorCodes.UserAlreadyBanned
+                );
+            }
+
+            var banResult = await ApplyBanAsync(user, command.Duration, command.Reason);
+            if (!banResult.Succeeded)
+            {
+                _logger.LogError("Failed to ban user {UserId} by admin {AdminId}.", command.UserId, adminId);
+                throw new InternalServerException("Failed to ban user.");
+            }
+
+            if (await ApprovePendingReportsForUserAsync(user.Id, adminId))
+            {
+                await _context.SaveChangesAsync(_ct);
+            }
+
+            _logger.LogInformation("Admin with id {AdminId} banned user with id {UserId}.", adminId, command.UserId);
+
+            return Result.Success(
+                message: "User banned successfully.",
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
         private async Task<IdentityResult> ApplyBanAsync(User user, TimeSpan? duration, string reason)
         {
             if (!user.LockoutEnabled)
@@ -294,6 +340,30 @@ namespace Services.Services
             }
 
             return result;
+        }
+
+        private async Task<bool> ApprovePendingReportsForUserAsync(
+            Guid userId,
+            Guid adminId,
+            Guid? excludeReportId = null)
+        {
+            var query = _context.UserReports
+                .Where(ur => ur.ReportedUserId == userId && ur.Status == ReportStatusEnum.Pending);
+
+            if (excludeReportId.HasValue)
+            {
+                query = query.Where(ur => ur.Id != excludeReportId.Value);
+            }
+
+            var pendingReports = await query.ToListAsync(_ct);
+
+            foreach (var pendingReport in pendingReports)
+            {
+                var stateMachine = new UserReportStateMachine(pendingReport);
+                stateMachine.Approve(adminId);
+            }
+
+            return pendingReports.Count > 0;
         }
     }
 }

@@ -82,7 +82,7 @@ namespace Api.Controllers
         [EndpointSummary("Unban user")]
         [EndpointDescription("Immediately lifts an active temporary or permanent ban from a specific user and restores their account access. " +
             "Returns 200 when the user is successfully unbanned, 400 if the user does not have an active ban, or 404 if the user does not exist.")]
-        [HttpPatch("unban/{userId:guid}")]
+        [HttpPost("unban/{userId:guid}")]
         [Authorize(Roles = "Admin")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         public async Task<IActionResult> UnbanUserAsync(
@@ -91,6 +91,23 @@ namespace Api.Controllers
             )
         {
             var result = await ban.UnbanUserAsync(userId, CurrentUserId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Ban user directly")]
+        [EndpointDescription("Directly applies a temporary or permanent ban to a specific user without requiring a prior user report, " +
+            "and automatically approves any pending reports against that user. Leave 'duration' null for a permanent ban or specify a TimeSpan for a temporary ban. " +
+            "Returns 200 when the user is banned, 400 if the admin tries to ban themselves, the user is already banned, or validation fails, or 404 if the user does not exist.")]
+        [HttpPost("ban")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        public async Task<IActionResult> BanUserAsync(
+            [FromServices] IBanServices ban,
+            [FromServices] BanMapper mapper,
+            [FromBody] BanUserRequest request
+            )
+        {
+            var result = await ban.BanUserAsync(mapper.ToBan(request), CurrentUserId);
             return HandleResult(result);
         }
     }
