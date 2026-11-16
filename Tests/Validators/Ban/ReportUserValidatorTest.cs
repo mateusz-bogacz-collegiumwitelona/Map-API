@@ -104,7 +104,7 @@ namespace Tests.Validators.Ban
         public async Task Validate_WhenReasonIsOnlyWhitespace_ShouldHaveValidationError()
         {
             // Arrange
-            var request = new ReportUserRequest { UserId = Guid.NewGuid(), Reason = "          "};
+            var request = new ReportUserRequest { UserId = Guid.NewGuid(), Reason = "          " };
 
             // Act
             var result = await _validator.TestValidateAsync(request);

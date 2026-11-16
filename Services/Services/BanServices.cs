@@ -1,6 +1,5 @@
 ﻿using Domain.Common;
 using Domain.Const;
-using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
@@ -8,7 +7,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
 using Services.Command.Ban;
+using Services.Command.List;
+using Services.Helpers;
 using Services.Interfaces;
+using Services.QueryExtension;
+using Services.Response.Ban;
 
 namespace Services.Services
 {
@@ -45,10 +48,10 @@ namespace Services.Services
             if (!await _context.Users.AnyAsync(u => u.Id == command.UserId, _ct))
             {
                 _logger.LogWarning("User {UserId} attempted to report a non-existent user {TargetUserId}.", command.UserId, currentUserId);
-              return Result.Failure(
-                    message: "The user you are trying to report does not exist.",
-                    errorCode: ErrorCodes.UserNotFound,
-                    statusCode: StatusCodes.Status404NotFound);
+                return Result.Failure(
+                      message: "The user you are trying to report does not exist.",
+                      errorCode: ErrorCodes.UserNotFound,
+                      statusCode: StatusCodes.Status404NotFound);
             }
 
             var report = new UserReport
@@ -66,5 +69,24 @@ namespace Services.Services
                 statusCode: StatusCodes.Status200OK
                 );
         }
+
+        public async Task<Result<PagedResult<ReportListResponse>>> GetReportListAsync(ReportListCommand command)
+            => await _context.UserReports
+                .AsNoTracking()
+                .ApplyFilter(command.IsShowAll)
+                .ApplySorting(command.SortBy, command.SortDescending)
+                .ApplySearch(command.SearchTerm)
+                .Select(ur => new ReportListResponse
+                {
+                    Id = ur.Id,
+                    ReportedUserId = ur.ReportedUserId,
+                    FirstName = ur.ReportedUser.FirstName,
+                    LastName = ur.ReportedUser.LastName,
+                    Reason = ur.Reason.Length > 50 ? ur.Reason.Substring(0, 50) + "..." : ur.Reason,
+                    Status = ur.Status,
+                    CreatedAt = ur.CreatedAt,
+                    ResolvedAt = ur.ResolvedAt
+                })
+            .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Reports", _ct);
     }
 }

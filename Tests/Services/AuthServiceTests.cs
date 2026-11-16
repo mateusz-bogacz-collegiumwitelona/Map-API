@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
-using Services.Commands.Auth;
+using Services.Command.Auth;
 using Services.Interfaces.Auth;
 using Services.Options;
 using Services.Services.Auth;

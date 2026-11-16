@@ -17,6 +17,8 @@ namespace Tests.Other
 
             #region Validation
             await Assert.That(ErrorCodes.ValidationError).IsEqualTo("VAL_001");
+            await Assert.That(ErrorCodes.PageNumberInvalid).IsEqualTo("VAL_002");
+            await Assert.That(ErrorCodes.PageSizeInvalid).IsEqualTo("VAL_003");
             #endregion
 
             #region Common
@@ -72,6 +74,8 @@ namespace Tests.Other
 
                 #region Validation
                 ErrorCodes.ValidationError,
+                ErrorCodes.PageNumberInvalid,
+                ErrorCodes.PageSizeInvalid,
                 #endregion
 
                 #region Common

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
-using Services.Commands.Auth;
+using Services.Command.Auth;
 using Services.Interfaces.Auth;
 using Services.Response.Auth;
 

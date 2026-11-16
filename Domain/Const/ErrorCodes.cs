@@ -15,6 +15,8 @@
 
         #region Validation
         public const string ValidationError = "VAL_001";
+        public const string PageNumberInvalid = "VAL_002";
+        public const string PageSizeInvalid = "VAL_003";
         #endregion
 
         #region Common
