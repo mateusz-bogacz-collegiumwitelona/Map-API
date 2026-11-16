@@ -1,5 +1,6 @@
 ﻿using Domain.Common;
 using Domain.Const;
+using Domain.Enum;
 using Domain.Exceptions;
 using Domain.Models;
 using Domain.State;
@@ -199,6 +200,18 @@ namespace Services.Services
                 {
                     _logger.LogError("Failed to ban user {UserId} for report {ReportId}", report.ReportedUserId, report.Id);
                     throw new InternalServerException("Failed to ban reported user.");
+                }
+
+                var otherPendingReports = await _context.UserReports
+                    .Where(ur => ur.ReportedUserId == report.ReportedUserId
+                              && ur.Id != report.Id
+                              && ur.Status == ReportStatusEnum.Pending)
+                    .ToListAsync(_ct);
+
+                foreach (var otherReport in otherPendingReports)
+                {
+                    var otherStateMachine = new UserReportStateMachine(otherReport);
+                    otherStateMachine.Approve(adminId);
                 }
             }
 

@@ -1206,6 +1206,50 @@ namespace Tests.Services
             await Assert.That(updatedUser.BannedUntil!.Value).IsGreaterThan(DateTime.UtcNow);
         }
 
+        [Test]
+        public async Task ResolveReportAsync_WhenUserIsBanned_ShouldAlsoApproveOtherPendingReportsForSameUser()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporterA = await AddUserAsync("Adam", "Reporter");
+            var reporterB = await AddUserAsync("Beata", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var otherUser = await AddUserAsync("Piotr", "Zielinski");
+
+            var mainReport = await AddReportAsync(reported, reporterA, reason: "Spam 1");
+            var duplicateReport1 = await AddReportAsync(reported, reporterB, reason: "Spam 2");
+            var duplicateReport2 = await AddReportAsync(reported, reporterA, reason: "Spam 3");
+            var unrelatedReport = await AddReportAsync(otherUser, reporterA, reason: "Other user report");
+
+            var command = CreateResolveCommand(mainReport.Id, isBanned: true, duration: TimeSpan.FromDays(7));
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var reports = await _context.UserReports.AsNoTracking().ToListAsync();
+
+            var resolvedMain = reports.Single(r => r.Id == mainReport.Id);
+            var resolvedDup1 = reports.Single(r => r.Id == duplicateReport1.Id);
+            var resolvedDup2 = reports.Single(r => r.Id == duplicateReport2.Id);
+            var untouchedOther = reports.Single(r => r.Id == unrelatedReport.Id);
+
+            await Assert.That(resolvedMain.Status).IsEqualTo(ReportStatusEnum.Approved);
+            await Assert.That(resolvedDup1.Status).IsEqualTo(ReportStatusEnum.Approved);
+            await Assert.That(resolvedDup1.ResolvedByAdminId).IsEqualTo(admin.Id);
+            await Assert.That(resolvedDup1.ResolvedAt).IsNotNull();
+
+            await Assert.That(resolvedDup2.Status).IsEqualTo(ReportStatusEnum.Approved);
+            await Assert.That(resolvedDup2.ResolvedByAdminId).IsEqualTo(admin.Id);
+            await Assert.That(resolvedDup2.ResolvedAt).IsNotNull();
+
+            await Assert.That(untouchedOther.Status).IsEqualTo(ReportStatusEnum.Pending);
+            await Assert.That(untouchedOther.ResolvedByAdminId).IsNull();
+            await Assert.That(untouchedOther.ResolvedAt).IsNull();
+        }
+
         #endregion
 
         #region UnbanUserAsync
