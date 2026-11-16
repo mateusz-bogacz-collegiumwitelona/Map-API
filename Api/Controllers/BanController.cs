@@ -18,7 +18,7 @@ namespace Api.Controllers
         [EndpointDescription("Reports a user for inappropriate behavior. " +
             "The report reason must be between 5 and 500 characters. " +
             "Returns 400 when the userId or reason is invalid and 404 when the user does not exist.")]
-        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status201Created)]
         [HttpPost("report")]
         [Authorize]
         public async Task<IActionResult> ReportUserAsync(
@@ -45,6 +45,20 @@ namespace Api.Controllers
             )
         {
             var result = await ban.GetReportListAsync(mapper.ToReportList(request));
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Get report details")]
+        [EndpointDescription("Retrieves detailed information about a specific user report. " +
+            "Returns 200 with the report details or 404 if the report does not exist.")]
+        [ProducesResponseType(typeof(Result<ReportDetailResponse>), StatusCodes.Status200OK)]
+        [HttpGet("report/{id:guid}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetReportDetailAsync(
+            [FromRoute] Guid id,
+            [FromServices] IBanServices ban)
+        {
+            var result = await ban.GetReportDetailAsync(id);
             return HandleResult(result);
         }
     }

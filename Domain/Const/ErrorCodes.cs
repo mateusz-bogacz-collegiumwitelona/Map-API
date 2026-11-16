@@ -54,6 +54,7 @@
         public const string ReportEmpty = "BAN_001";
         public const string ReportTooLong = "BAN_002";
         public const string ReportTooShort = "BAN_003";
+        public const string ReportNotFound = "BAN_004";
         #endregion
     }
 }

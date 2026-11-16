@@ -64,9 +64,10 @@ namespace Services.Services
             _context.UserReports.Add(report);
             await _context.SaveChangesAsync(_ct);
 
+            _logger.LogInformation("User {ReporterId} reported user {ReportedId} with reason: {Reason}", currentUserId, command.UserId, command.Reason);
             return Result.Success(
                 message: "User reported successfully.",
-                statusCode: StatusCodes.Status200OK
+                statusCode: StatusCodes.Status201Created
                 );
         }
 
@@ -88,5 +89,53 @@ namespace Services.Services
                     ResolvedAt = ur.ResolvedAt
                 })
             .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Reports", _ct);
+
+        public async Task<Result<ReportDetailResponse>> GetReportDetailAsync(Guid id)
+        {
+            var report = await _context.UserReports
+                .AsNoTracking()
+                .Where(ur => ur.Id == id)
+                .Select(ur => new ReportDetailResponse
+                {
+                    Id = ur.Id,
+
+                    ReportedFirstName = ur.ReportedUser.FirstName,
+                    ReportedLastName = ur.ReportedUser.LastName,
+
+                    ReporterFirstName = ur.ReporterUser.FirstName,
+                    ReporterLastName = ur.ReporterUser.LastName,
+
+                    Reason = ur.Reason,
+                    Status = ur.Status,
+
+                    ResolvedByAdminFirstName = ur.ResolvedByAdmin != null
+                        ? ur.ResolvedByAdmin.FirstName
+                        : null,
+
+                    ResolvedByAdminLastName = ur.ResolvedByAdmin != null
+                        ? ur.ResolvedByAdmin.LastName
+                        : null,
+
+                    ResolvedAt = ur.ResolvedAt,
+                    CreatedAt = ur.CreatedAt
+                })
+                .FirstOrDefaultAsync(_ct);
+
+            if (report == null)
+            {
+                _logger.LogWarning("Report with ID {ReportId} not found.", id);
+
+                return Result<ReportDetailResponse>.Failure(
+                    message: "Report not found.",
+                    errorCode: ErrorCodes.ReportNotFound,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            _logger.LogInformation("Retrieved details for report ID: {ReportId}", id);
+            return Result<ReportDetailResponse>.Success(
+                message: "Report details retrieved successfully.",
+                data: report,
+                statusCode: StatusCodes.Status200OK);
+        }
     }
 }

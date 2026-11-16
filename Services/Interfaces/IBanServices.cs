@@ -9,5 +9,6 @@ namespace Services.Interfaces
     {
         Task<Result> ReportUserAsync(ReportUserCommand command, Guid currentUserId);
         Task<Result<PagedResult<ReportListResponse>>> GetReportListAsync(ReportListCommand command);
+        Task<Result<ReportDetailResponse>> GetReportDetailAsync(Guid id);
     }
 }
