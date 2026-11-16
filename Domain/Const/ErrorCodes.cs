@@ -35,6 +35,7 @@
         public const string EmailTaken = "USR_005";
         public const string EmailUnchanged = "USR_006";
         public const string EmailAlreadyExist = "USR_007";
+        public const string UserNotFound = "USR_008";
         #endregion
 
         #region Verification
@@ -45,6 +46,12 @@
 
         #region Trip
         public const string YearInvalid = "TRIP_001";
+        #endregion
+
+        #region Ban / Report
+        public const string ReportEmpty = "BAN_001";
+        public const string ReportTooLong = "BAN_002";
+        public const string ReportTooShort = "BAN_003";
         #endregion
     }
 }

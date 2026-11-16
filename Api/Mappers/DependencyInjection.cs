@@ -6,6 +6,8 @@
         {
             services.AddSingleton<AuthMapper>();
             services.AddSingleton<UserMapper>();
+            services.AddSingleton<BanMapper>();
+
             return services;
         }
     }
