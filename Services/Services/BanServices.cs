@@ -210,6 +210,51 @@ namespace Services.Services
             );
         }
 
+        public async Task<Result> UnbanUserAsync(Guid userId, Guid adminId)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+
+            if (user == null)
+            {
+                _logger.LogWarning("Admin with id {AdminId} tried to unban non-existent user with id {UserId}.",
+                    adminId, userId);
+                return Result.Failure(
+                    message: "User does not exist.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.UserNotFound
+                );
+            }
+
+            if (!user.HasActiveBan())
+            {
+                _logger.LogWarning("Admin with id {AdminId} tried to unban user with id {UserId} who is not currently banned.",
+                    adminId, userId);
+
+                return Result.Failure(
+                    message: "User is not currently banned.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: ErrorCodes.UserNotBanned
+                );
+            }
+
+            user.IsBanned = false;
+            user.BannedReason = null;
+            user.BannedUntil = null;
+
+            var unbanResult = await _userManager.SetLockoutEndDateAsync(user, null);
+            if (!unbanResult.Succeeded)
+            {
+                _logger.LogError("Failed to unban user {UserId} by admin {AdminId}.", userId, adminId);
+                throw new InternalServerException("Failed to unban user.");
+            }
+
+            _logger.LogInformation("Admin with id {AdminId} unbanned user with id {UserId}.", adminId, userId);
+            return Result.Success(
+                message: "User unbanned successfully.",
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
         private async Task<IdentityResult> ApplyBanAsync(User user, TimeSpan? duration, string reason)
         {
             if (!user.LockoutEnabled)

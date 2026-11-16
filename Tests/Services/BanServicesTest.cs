@@ -1207,5 +1207,132 @@ namespace Tests.Services
         }
 
         #endregion
+
+        #region UnbanUserAsync
+
+        [Test]
+        public async Task UnbanUserAsync_WhenUserDoesNotExist_ShouldReturnNotFoundFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var missingUserId = Guid.NewGuid();
+
+            // Act
+            var result = await _sut.UnbanUserAsync(missingUserId, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.Message).IsEqualTo("User does not exist.");
+        }
+
+        [Test]
+        public async Task UnbanUserAsync_WhenUserIsEmptyGuid_ShouldReturnNotFoundFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+
+            // Act
+            var result = await _sut.UnbanUserAsync(Guid.Empty, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+        }
+
+        [Test]
+        public async Task UnbanUserAsync_WhenUserIsNotBanned_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var user = await AddUserAsync("Anna", "Nowak", isBanned: false);
+
+            // Act
+            var result = await _sut.UnbanUserAsync(user.Id, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotBanned);
+            await Assert.That(result.Message).IsEqualTo("User is not currently banned.");
+        }
+
+        [Test]
+        public async Task UnbanUserAsync_WhenUserTemporaryBanHasAlreadyExpired_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var user = await AddUserAsync(
+                "Anna",
+                "Nowak",
+                isBanned: true,
+                bannedUntil: DateTime.UtcNow.AddMinutes(-5),
+                bannedReason: "Expired ban");
+
+            // Act
+            var result = await _sut.UnbanUserAsync(user.Id, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotBanned);
+        }
+
+        [Test]
+        public async Task UnbanUserAsync_WhenUserHasActiveTemporaryBan_ShouldClearBanFieldsAndLockout()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var user = await AddUserAsync(
+                "Anna",
+                "Nowak",
+                isBanned: true,
+                bannedUntil: DateTime.UtcNow.AddDays(7),
+                bannedReason: "Spam");
+
+            // Act
+            var result = await _sut.UnbanUserAsync(user.Id, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("User unbanned successfully.");
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
+            await Assert.That(updatedUser.IsBanned).IsFalse();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsNull();
+            await Assert.That(updatedUser.LockoutEnd).IsNull();
+        }
+
+        [Test]
+        public async Task UnbanUserAsync_WhenUserHasPermanentBan_ShouldClearBanFieldsAndLockout()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var user = await AddUserAsync(
+                "Anna",
+                "Nowak",
+                isBanned: true,
+                bannedUntil: null,
+                bannedReason: "Severe violation");
+
+            // Act
+            var result = await _sut.UnbanUserAsync(user.Id, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
+            await Assert.That(updatedUser.IsBanned).IsFalse();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsNull();
+            await Assert.That(updatedUser.LockoutEnd).IsNull();
+        }
+
+        #endregion
     }
 }

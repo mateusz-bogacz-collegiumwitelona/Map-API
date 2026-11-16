@@ -61,6 +61,7 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.UserAlreadyBanned).IsEqualTo("BAN_006");
             await Assert.That(ErrorCodes.BanDurationInvalid).IsEqualTo("BAN_007");
             await Assert.That(ErrorCodes.BanDurationNotAllowed).IsEqualTo("BAN_008");
+            await Assert.That(ErrorCodes.UserNotBanned).IsEqualTo("BAN_009");
 
             #endregion
         }
@@ -125,6 +126,7 @@ namespace Tests.Other
                 ErrorCodes.UserAlreadyBanned,
                 ErrorCodes.BanDurationInvalid,
                 ErrorCodes.BanDurationNotAllowed,
+                ErrorCodes.UserNotBanned
                 #endregion
             };
 

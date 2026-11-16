@@ -11,5 +11,6 @@ namespace Services.Interfaces
         Task<Result<PagedResult<ReportListResponse>>> GetReportListAsync(ReportListCommand command);
         Task<Result<ReportDetailResponse>> GetReportDetailAsync(Guid id);
         Task<Result> ResolveReportAsync(ResolveReportCommand command, Guid adminId);
+        Task<Result> UnbanUserAsync(Guid userId, Guid adminId);
     }
 }

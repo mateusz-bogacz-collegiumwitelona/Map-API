@@ -78,5 +78,20 @@ namespace Api.Controllers
             var result = await ban.ResolveReportAsync(mapper.ToResolve(request), CurrentUserId);
             return HandleResult(result);
         }
+
+        [EndpointSummary("Unban user")]
+        [EndpointDescription("Immediately lifts an active temporary or permanent ban from a specific user and restores their account access. " +
+            "Returns 200 when the user is successfully unbanned, 400 if the user does not have an active ban, or 404 if the user does not exist.")]
+        [HttpPatch("unban/{userId:guid}")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UnbanUserAsync(
+            [FromServices] IBanServices ban,
+            [FromRoute] Guid userId
+            )
+        {
+            var result = await ban.UnbanUserAsync(userId, CurrentUserId);
+            return HandleResult(result);
+        }
     }
 }
