@@ -11,8 +11,6 @@ namespace Services.Response.Trip
         public required DateTime StartDate { get; init; }
         public DateTime? EndDate { get; init; }
         public decimal TotalDistance { get; init; }
-        [JsonConverter(typeof(JsonStringEnumConverter<TransportTypeEnum>))]
-
         public IReadOnlyList<TransportTypeEnum> TransportTypes { get; init; } = [];
     }
 }

@@ -844,6 +844,23 @@ namespace Tests.Services
             await Assert.That(result.Data.HasNextPage).IsFalse();
             await Assert.That(result.Data.HasPreviousPage).IsFalse();
         }
+
+        [Test]
+        public async Task TripSummaryResponse_ShouldSerializeTransportTypesAsText()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user, Utc(2025, 5, 1));
+            await AddSegmentAsync(trip, 0, TransportTypeEnum.Car);
+            await AddSegmentAsync(trip, 1, TransportTypeEnum.Plane);
+
+            // Act
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), user.Id);
+            var json = JsonSerializer.Serialize(result.Data!.Items.Single(), JsonSerializerOptions.Web);
+
+            // Assert
+            await Assert.That(json).Contains("\"transportTypes\":[\"Car\",\"Plane\"]");
+        }
         #endregion
 
         #region Visited countries
