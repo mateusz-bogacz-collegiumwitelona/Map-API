@@ -349,9 +349,9 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
-            await Assert.That(result.Message).IsEqualTo("Invalid email or password.");
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.EmailNotConfirmed);
+            await Assert.That(result.Message).IsEqualTo("Email address is not confirmed.");
             await Assert.That(result.Data).IsNull();
 
             await Assert.That(await Context.RefreshTokens.CountAsync()).IsEqualTo(0);

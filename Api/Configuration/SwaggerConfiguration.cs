@@ -1,4 +1,5 @@
-﻿using Microsoft.OpenApi;
+﻿using Api.Transformers;
+using Microsoft.OpenApi;
 
 namespace Api.Configuration
 {
@@ -8,6 +9,8 @@ namespace Api.Configuration
         {
             services.AddOpenApi(options =>
             {
+                options.AddOperationTransformer<LoginRequestExamplesTransformer>();
+
                 options.AddDocumentTransformer(static (document, context, cancellationToken) =>
                 {
                     document.Components ??= new OpenApiComponents();

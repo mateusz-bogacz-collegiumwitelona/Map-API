@@ -6,6 +6,7 @@
         {
             services.AddSingleton<AuthMapper>();
             services.AddSingleton<UserMapper>();
+            services.AddSingleton<ListMapper>();
             return services;
         }
     }
