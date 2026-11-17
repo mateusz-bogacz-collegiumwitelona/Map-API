@@ -17,6 +17,7 @@ using Services.Interfaces;
 using Services.Interfaces.Auth;
 using Services.QueryExtension;
 using Services.Response.Ban;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Services.Services
 {
@@ -59,13 +60,25 @@ namespace Services.Services
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if (!await _context.Users.AnyAsync(u => u.Id == command.UserId, _ct))
+            var reportedUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == command.UserId, _ct);
+
+            if (reportedUser == null)
             {
                 _logger.LogWarning("User {UserId} attempted to report a non-existent user {TargetUserId}.", currentUserId, command.UserId);
                 return Result.Failure(
-                      message: "The user you are trying to report does not exist.",
-                      errorCode: ErrorCodes.NotFound,
-                      statusCode: StatusCodes.Status404NotFound);
+                    message: "The user you are trying to report does not exist.",
+                    errorCode: ErrorCodes.NotFound,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            if (await IsAdminAsync(reportedUser))
+            {
+                _logger.LogWarning("User {UserId} attempted to report an admin {TargetUserId}.", currentUserId, command.UserId);
+                return Result.Failure(
+                    message: "You cannot report an administrator.",
+                    errorCode: ErrorCodes.InvalidOperation,
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
             var report = new UserReport
@@ -197,6 +210,16 @@ namespace Services.Services
                         errorCode: ErrorCodes.InvalidOperation);
                 }
 
+                if (await IsAdminAsync(report.ReportedUser))
+                {
+                    _logger.LogWarning("Admin with id {AdminId} attempted to ban admin {UserId} via report {ReportId}.",
+                        adminId, report.ReportedUserId, report.Id);
+                    return Result.Failure(
+                        message: "You cannot ban an administrator.",
+                        statusCode: StatusCodes.Status400BadRequest,
+                        errorCode: ErrorCodes.InvalidOperation);
+                }
+
                 if (report.ReportedUser.HasActiveBan())
                 {
                     _logger.LogWarning("Admin with id {AdminId} tried to ban user with id {UserId} who is already banned.",
@@ -233,6 +256,7 @@ namespace Services.Services
                     statusCode: StatusCodes.Status404NotFound,
                     errorCode: ErrorCodes.NotFound);
             }
+
 
             if (!user.HasActiveBan())
             {
@@ -277,6 +301,15 @@ namespace Services.Services
                     statusCode: StatusCodes.Status404NotFound,
                     errorCode: ErrorCodes.NotFound
                 );
+            }
+
+            if (await IsAdminAsync(user))
+            {
+                _logger.LogWarning("Admin with id {AdminId} attempted to ban admin {UserId}.", adminId, command.UserId);
+                return Result.Failure(
+                    message: "You cannot ban an administrator.",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    errorCode: ErrorCodes.InvalidOperation);
             }
 
             if (user.HasActiveBan())
@@ -353,5 +386,7 @@ namespace Services.Services
                 _logger.LogError(ex, "Failed to send ban notification email to user {UserId}.", user.Id);
             }
         }
+
+        private Task<bool> IsAdminAsync(User user) => _userManager.IsInRoleAsync(user, "Admin");
     }
 }

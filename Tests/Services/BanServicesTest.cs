@@ -246,6 +246,34 @@ namespace Tests.Services
                 PageNumber = pageNumber,
                 PageSize = pageSize
             };
+
+        private async Task<User> AddAdminUserAsync(
+            string firstName = "Admin",
+            string lastName = "User")
+        {
+            var user = await AddUserAsync(firstName, lastName);
+
+            var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.NormalizedName == "ADMIN");
+            if (adminRole == null)
+            {
+                adminRole = new IdentityRole<Guid>
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Admin",
+                    NormalizedName = "ADMIN"
+                };
+                _context.Roles.Add(adminRole);
+            }
+
+            _context.UserRoles.Add(new IdentityUserRole<Guid>
+            {
+                UserId = user.Id,
+                RoleId = adminRole.Id
+            });
+
+            await _context.SaveChangesAsync();
+            return user;
+        }
         #endregion
 
         #region ReportUserAsync 
@@ -457,6 +485,26 @@ namespace Tests.Services
             await Assert.That(await _context.UserReports.AnyAsync()).IsFalse();
         }
 
+        [Test]
+        public async Task ReportUserAsync_WhenReportedUserIsAdmin_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var reporter = await AddUserAsync();
+            var adminTarget = await AddAdminUserAsync("Super", "Admin");
+
+            // Act
+            var result = await _sut.ReportUserAsync(CreateCommand(adminTarget.Id), reporter.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidOperation);
+            await Assert.That(result.Message).IsEqualTo("You cannot report an administrator.");
+            await Assert.That(await _context.UserReports.AnyAsync()).IsFalse();
+        }
+        #endregion
+
+        #region GetReportListAsync
         [Test]
         public async Task GetReportListAsync_WhenIsShowAllIsFalse_ShouldReturnOnlyPendingReports()
         {
@@ -1308,6 +1356,29 @@ namespace Tests.Services
             await Assert.That(_emailService.SentEmails).IsEmpty();
         }
 
+        [Test]
+        public async Task ResolveReportAsync_WhenReportedUserIsAdmin_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var resolvingAdmin = await AddAdminUserAsync("Admin", "One");
+            var reportedAdmin = await AddAdminUserAsync("Admin", "Two");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var report = await AddReportAsync(reportedAdmin, reporter, reason: "Attempted admin ban");
+
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: TimeSpan.FromDays(1), reason: "Admin ban");
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, resolvingAdmin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidOperation);
+            await Assert.That(result.Message).IsEqualTo("You cannot ban an administrator.");
+
+            var unchangedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == reportedAdmin.Id);
+            await Assert.That(unchangedUser.IsBanned).IsFalse();
+        }
         #endregion
 
         #region UnbanUserAsync
@@ -1626,6 +1697,32 @@ namespace Tests.Services
             await Assert.That(updatedUser.BannedReason).IsEqualTo("Direct ban despite SMTP failure");
         }
 
+        [Test]
+        public async Task BanUserAsync_WhenTargetUserIsAdmin_ShouldReturnBadRequestFailure()
+        {
+            // Arrange
+            var admin = await AddAdminUserAsync("Admin", "One");
+            var targetAdmin = await AddAdminUserAsync("Admin", "Two");
+
+            var command = new BanUserCommand
+            {
+                UserId = targetAdmin.Id,
+                Reason = "Attempting to ban another admin",
+                Duration = TimeSpan.FromDays(7)
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidOperation);
+            await Assert.That(result.Message).IsEqualTo("You cannot ban an administrator.");
+
+            var unchangedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == targetAdmin.Id);
+            await Assert.That(unchangedUser.IsBanned).IsFalse();
+        }
         #endregion
     }
 }
