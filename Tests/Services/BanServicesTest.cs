@@ -1,6 +1,7 @@
 ﻿using Domain.Const;
 using Domain.Enum;
 using Domain.Models;
+using DotNet.Testcontainers.Builders;
 using Infrastructure;
 using Infrastructure.Interceptors;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +14,10 @@ using Npgsql;
 using Services.Command.Ban;
 using Services.Command.List;
 using Services.Interfaces;
+using Services.Interfaces.Auth;
+using Services.Options;
 using Services.Services;
+using Services.Services.Auth;
 using Testcontainers.PostgreSql;
 using Tests.Fakes;
 
@@ -32,6 +36,8 @@ namespace Tests.Services
         private UserManager<User> _userManager = null!;
 
         private FakeEmailService _emailService = null!;
+
+        private  ITokenService _tokenService = null!;
 
         [Before(Class)]
         public static async Task SetupClassAsync()
@@ -107,13 +113,22 @@ namespace Tests.Services
                 new LoggerFactory().CreateLogger<UserManager<User>>());
 
             _emailService = new FakeEmailService();
+            _tokenService = new TokenService(_context, Options.Create(new JwtOptions
+            {
+                Issuer = "TestIssuer",
+                Audience = "TestAudience",
+                AccessTokenExpirationMinutes = 60,
+                RefreshTokenExpirationDays = 7,
+                SecretKey = "ThisIsASecretKeyForTestingPurposesOnly!"
+            }));
 
             _sut = new BanServices(
                 _context,
                 new LoggerFactory().CreateLogger<BanServices>(),
                 new FakeCancellationTokenAccessor(),
                 _userManager,
-                _emailService);
+                _emailService,
+                _tokenService);
         }
 
         [After(Test)]
@@ -149,10 +164,7 @@ namespace Tests.Services
                 LastName = lastName,
                 IsBanned = isBanned,
                 BannedUntil = bannedUntil,
-                BannedReason = bannedReason,
-                LockoutEnd = isBanned
-                    ? (bannedUntil.HasValue ? new DateTimeOffset(bannedUntil.Value, TimeSpan.Zero) : DateTimeOffset.MaxValue)
-                    : null
+                BannedReason = bannedReason
             };
 
             _context.Users.Add(user);
@@ -164,12 +176,14 @@ namespace Tests.Services
         private static ResolveReportCommand CreateResolveCommand(
             Guid reportId,
             bool isBanned = false,
-            TimeSpan? duration = null)
+            TimeSpan? duration = null,
+            string? reason = "Admin ban reason")
             => new ResolveReportCommand
             {
                 Id = reportId,
                 IsBanned = isBanned,
-                Duration = duration
+                Duration = duration,
+                Reason = reason
             };
 
         private static ReportUserCommand CreateCommand(Guid reportedUserId, string reason = "Spam")
@@ -391,7 +405,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
             await Assert.That(result.Message).IsEqualTo("The user you are trying to report does not exist.");
         }
 
@@ -419,7 +433,7 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
         }
 
         [Test]
@@ -438,7 +452,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
             await Assert.That(await _context.UserReports.AnyAsync()).IsFalse();
         }
 
@@ -1012,7 +1026,7 @@ namespace Tests.Services
         #region ResolveReportAsync
 
         [Test]
-        public async Task ResolveReportAsync_WhenReportDoesNotExist_ShouldReturnBadRequestFailure()
+        public async Task ResolveReportAsync_WhenReportDoesNotExist_ShouldReturnNotFoundFailure()
         {
             // Arrange
             var admin = await AddUserAsync("Admin", "User");
@@ -1023,7 +1037,7 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
             await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.ReportNotFound);
             await Assert.That(result.Message).IsEqualTo("Report does not exist.");
         }
@@ -1094,7 +1108,7 @@ namespace Tests.Services
             var initialSecurityStamp = reported.SecurityStamp;
             var report = await AddReportAsync(reported, reporter, reason: "Severe harassment");
 
-            var command = CreateResolveCommand(report.Id, isBanned: true, duration: null);
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: null, reason: "Severe harassment");
 
             // Act
             var result = await _sut.ResolveReportAsync(command, admin.Id);
@@ -1112,9 +1126,6 @@ namespace Tests.Services
             await Assert.That(updatedUser.IsBanned).IsTrue();
             await Assert.That(updatedUser.BannedUntil).IsNull();
             await Assert.That(updatedUser.BannedReason).IsEqualTo("Severe harassment");
-            await Assert.That(updatedUser.LockoutEnabled).IsTrue();
-            await Assert.That(updatedUser.LockoutEnd).IsEqualTo(DateTimeOffset.MaxValue);
-            await Assert.That(updatedUser.SecurityStamp).IsNotEqualTo(initialSecurityStamp);
         }
 
         [Test]
@@ -1128,7 +1139,7 @@ namespace Tests.Services
 
             var duration = TimeSpan.FromDays(7);
             var beforeBan = DateTime.UtcNow;
-            var command = CreateResolveCommand(report.Id, isBanned: true, duration: duration);
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: duration, reason: "Spam links");
 
             // Act
             var result = await _sut.ResolveReportAsync(command, admin.Id);
@@ -1145,7 +1156,6 @@ namespace Tests.Services
             await Assert.That(updatedUser.BannedUntil).IsNotNull();
             await Assert.That(updatedUser.BannedUntil!.Value).IsGreaterThanOrEqualTo(beforeBan.Add(duration));
             await Assert.That(updatedUser.BannedUntil!.Value).IsLessThanOrEqualTo(DateTime.UtcNow.Add(duration));
-            await Assert.That(updatedUser.LockoutEnd).IsNotNull();
         }
 
         [Test]
@@ -1189,11 +1199,11 @@ namespace Tests.Services
                 "Anna",
                 "Nowak",
                 isBanned: true,
-                bannedUntil: DateTime.UtcNow.AddDays(-1), // ban już wygasł
+                bannedUntil: DateTime.UtcNow.AddDays(-1), 
                 bannedReason: "Old expired ban");
             var report = await AddReportAsync(reported, reporter, reason: "Repeat offense");
 
-            var command = CreateResolveCommand(report.Id, isBanned: true, duration: TimeSpan.FromDays(14));
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: TimeSpan.FromDays(14), reason: "Repeat offense");
 
             // Act
             var result = await _sut.ResolveReportAsync(command, admin.Id);
@@ -1263,7 +1273,7 @@ namespace Tests.Services
             var reported = await AddUserAsync("Anna", "Nowak");
             var report = await AddReportAsync(reported, reporter, reason: "Severe harassment");
 
-            var command = CreateResolveCommand(report.Id, isBanned: true, duration: null);
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: null, reason: "Severe harassment");
 
             // Act
             var result = await _sut.ResolveReportAsync(command, admin.Id);
@@ -1314,7 +1324,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
             await Assert.That(result.Message).IsEqualTo("User does not exist.");
         }
 
@@ -1330,7 +1340,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
         }
 
         [Test]
@@ -1395,7 +1405,6 @@ namespace Tests.Services
             await Assert.That(updatedUser.IsBanned).IsFalse();
             await Assert.That(updatedUser.BannedUntil).IsNull();
             await Assert.That(updatedUser.BannedReason).IsNull();
-            await Assert.That(updatedUser.LockoutEnd).IsNull();
         }
 
         [Test]
@@ -1421,7 +1430,6 @@ namespace Tests.Services
             await Assert.That(updatedUser.IsBanned).IsFalse();
             await Assert.That(updatedUser.BannedUntil).IsNull();
             await Assert.That(updatedUser.BannedReason).IsNull();
-            await Assert.That(updatedUser.LockoutEnd).IsNull();
         }
 
         #endregion
@@ -1468,7 +1476,7 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.UserNotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
         }
 
         [Test]
@@ -1530,7 +1538,6 @@ namespace Tests.Services
             await Assert.That(updatedUser.BannedReason).IsEqualTo("Direct ban for spam");
             await Assert.That(updatedUser.BannedUntil).IsNotNull();
             await Assert.That(updatedUser.BannedUntil!.Value).IsGreaterThanOrEqualTo(beforeBan.Add(duration));
-            await Assert.That(updatedUser.LockoutEnd).IsNotNull();
 
             var updatedReport = await _context.UserReports.AsNoTracking().SingleAsync(r => r.Id == pendingReport.Id);
             await Assert.That(updatedReport.Status).IsEqualTo(ReportStatusEnum.Approved);
@@ -1562,7 +1569,6 @@ namespace Tests.Services
             await Assert.That(updatedUser.IsBanned).IsTrue();
             await Assert.That(updatedUser.BannedUntil).IsNull();
             await Assert.That(updatedUser.BannedReason).IsEqualTo("Permanent ban");
-            await Assert.That(updatedUser.LockoutEnd).IsEqualTo(DateTimeOffset.MaxValue);
         }
 
         [Test]

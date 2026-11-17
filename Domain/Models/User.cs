@@ -19,5 +19,19 @@ namespace Domain.Models
 
         public bool HasActiveBan() =>
             IsBanned && (!BannedUntil.HasValue || BannedUntil.Value > DateTime.UtcNow);
+
+        public void Ban(TimeSpan? duration, string reason)
+        {
+            IsBanned = true;
+            BannedUntil = duration.HasValue ? DateTime.UtcNow.Add(duration.Value) : null;
+            BannedReason = reason;
+        }
+
+        public void Unban()
+        {
+            IsBanned = false;
+            BannedUntil = null;
+            BannedReason = null;
+        }
     }
 }

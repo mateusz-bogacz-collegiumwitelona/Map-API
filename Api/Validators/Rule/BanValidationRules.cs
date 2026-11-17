@@ -5,7 +5,8 @@ namespace Api.Validators.Rule
 {
     public static class BanValidationRules
     {
-        public static IRuleBuilderOptions<T, string> ApplyBanReasonRules<T>(this IRuleBuilder<T, string> ruleBuilder)
+
+        public static IRuleBuilderOptions<T, string?> ApplyBanReasonRules<T>(this IRuleBuilder<T, string?> ruleBuilder)
             => ruleBuilder
                 .NotEmpty()
                     .WithErrorCode(ErrorCodes.ReportEmpty)
