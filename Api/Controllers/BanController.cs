@@ -1,4 +1,5 @@
-﻿using Api.Controllers.Base;
+﻿using Api.Configuration;
+using Api.Controllers.Base;
 using Api.Mappers;
 using Api.Request.Ban;
 using Api.Request.List;
@@ -37,7 +38,7 @@ namespace Api.Controllers
             "Returns 200 with the list of reports.")]
         [ProducesResponseType(typeof(Result<PagedResult<ReportListResponse>>), StatusCodes.Status200OK)]
         [HttpGet("reports")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         public async Task<IActionResult> GetReportListAsync(
             [FromQuery] ReportListRequest request,
             [FromServices] IBanServices ban,
@@ -53,7 +54,7 @@ namespace Api.Controllers
             "Returns 200 with the report details or 404 if the report does not exist.")]
         [ProducesResponseType(typeof(Result<ReportDetailResponse>), StatusCodes.Status200OK)]
         [HttpGet("report/{id:guid}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         public async Task<IActionResult> GetReportDetailAsync(
             [FromRoute] Guid id,
             [FromServices] IBanServices ban)
@@ -67,7 +68,7 @@ namespace Api.Controllers
             "Set 'isBanned' to false to reject the report, or true to approve it and apply a ban (leave 'duration' null for a permanent ban, or specify a TimeSpan for a temporary ban). " +
             "Returns 200 when the report is successfully resolved, or 400 if the report does not exist, has already been resolved, the reported user is already banned, or validation fails.")]
         [HttpPost("report/resolve")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         public async Task<IActionResult> ResolveReportAsync(
             [FromServices] IBanServices ban,
@@ -83,7 +84,7 @@ namespace Api.Controllers
         [EndpointDescription("Immediately lifts an active temporary or permanent ban from a specific user and restores their account access. " +
             "Returns 200 when the user is successfully unbanned, 400 if the user does not have an active ban, or 404 if the user does not exist.")]
         [HttpPost("unban/{userId:guid}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         public async Task<IActionResult> UnbanUserAsync(
             [FromServices] IBanServices ban,
@@ -99,7 +100,7 @@ namespace Api.Controllers
             "and automatically approves any pending reports against that user. Leave 'duration' null for a permanent ban or specify a TimeSpan for a temporary ban. " +
             "Returns 200 when the user is banned, 400 if the admin tries to ban themselves, the user is already banned, or validation fails, or 404 if the user does not exist.")]
         [HttpPost("ban")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
         public async Task<IActionResult> BanUserAsync(
             [FromServices] IBanServices ban,

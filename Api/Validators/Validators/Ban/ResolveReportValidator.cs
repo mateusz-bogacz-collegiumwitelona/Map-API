@@ -23,7 +23,16 @@ namespace Api.Validators.Validators.Ban
                     .WithErrorCode(ErrorCodes.BanDurationNotAllowed);
             });
 
-            RuleFor(x => x.Reason).ApplyBanReasonRules();
+            When(x => !x.IsBanned, () =>
+            {
+                RuleFor(x => x.Duration)
+                    .Null()
+                    .WithErrorCode(ErrorCodes.BanDurationNotAllowed);
+
+                RuleFor(x => x.Reason)
+                    .Null()
+                    .WithErrorCode(ErrorCodes.InvalidOperation);
+            });
 
         }
     }

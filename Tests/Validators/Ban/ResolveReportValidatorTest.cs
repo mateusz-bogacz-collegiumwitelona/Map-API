@@ -19,7 +19,8 @@ namespace Tests.Validators.Ban
             {
                 Id = Guid.NewGuid(),
                 IsBanned = false,
-                Duration = null
+                Duration = null,
+                Reason = null
             };
 
             // Act
@@ -37,7 +38,8 @@ namespace Tests.Validators.Ban
             {
                 Id = Guid.NewGuid(),
                 IsBanned = true,
-                Duration = null
+                Duration = null,
+                Reason = "Violation of community guidelines"
             };
 
             // Act
@@ -55,7 +57,8 @@ namespace Tests.Validators.Ban
             {
                 Id = Guid.NewGuid(),
                 IsBanned = true,
-                Duration = TimeSpan.FromDays(7)
+                Duration = TimeSpan.FromDays(7),
+                Reason = "Violation of community guidelines"
             };
 
             // Act

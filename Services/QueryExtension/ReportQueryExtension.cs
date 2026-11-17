@@ -29,7 +29,9 @@ namespace Services.QueryExtension
         public static IQueryable<UserReport> ApplySorting(
             this IQueryable<UserReport> query,
             string? sortBy,
-            bool sortDescending) => sortBy?.ToLowerInvariant() switch
+            bool sortDescending)
+        {
+            var orderedQuery = sortBy?.ToLowerInvariant() switch
             {
                 "createdat" => sortDescending
                     ? query.OrderByDescending(r => r.CreatedAt)
@@ -40,11 +42,14 @@ namespace Services.QueryExtension
                     : query.OrderBy(r => r.ResolvedAt),
 
                 "status" => sortDescending
-                        ? query.OrderByDescending(r => r.Status)
-                        : query.OrderBy(r => r.Status),
+                    ? query.OrderByDescending(r => r.Status)
+                    : query.OrderBy(r => r.Status),
 
                 _ => query.OrderByDescending(r => r.CreatedAt)
             };
+
+            return orderedQuery.ThenBy(r => r.Id);
+        }
 
         public static IQueryable<UserReport> ApplyFilter(
             this IQueryable<UserReport> query,

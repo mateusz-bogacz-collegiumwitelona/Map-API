@@ -134,6 +134,7 @@ namespace Tests.Services
         [After(Test)]
         public async Task CleanupAsync()
         {
+            _userManager.Dispose();
             await _context.DisposeAsync();
 
             using var conn = new NpgsqlConnection(_connectionString);
