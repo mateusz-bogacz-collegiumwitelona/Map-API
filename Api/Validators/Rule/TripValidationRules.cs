@@ -29,7 +29,6 @@ namespace Api.Validators.Rule
         public static IRuleBuilderOptions<T, decimal> ApplyRouteDistanceRules<T>(this IRuleBuilder<T, decimal> ruleBuilder)
             => ruleBuilder
                 .InclusiveBetween(TripConst.MinRouteDistanceKm, TripConst.MaxRouteDistanceKm)
-                .WithErrorCode(ErrorCodes.DistanceInvalid)
-                .WithMessage(FormattableString.Invariant($"Distance must be between {TripConst.MinRouteDistanceKm} and {TripConst.MaxRouteDistanceKm} km."));
+                .WithErrorCode(ErrorCodes.DistanceInvalid);
     }
 }

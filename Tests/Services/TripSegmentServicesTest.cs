@@ -1,6 +1,5 @@
 using Domain.Const;
 using Domain.Enum;
-using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Infrastructure.Interceptors;
@@ -358,7 +357,7 @@ namespace Tests.Services
 
         #region Ownership
         [Test]
-        public async Task UpdateRouteAsync_WhenSegmentBelongsToAnotherUser_ShouldThrowNotFoundAndKeepRoute()
+        public async Task UpdateRouteAsync_WhenSegmentBelongsToAnotherUser_ShouldReturnNotFoundAndKeepRoute()
         {
             // Arrange
             var owner = await AddUserAsync();
@@ -366,10 +365,14 @@ namespace Tests.Services
             var trip = await AddTripAsync(owner);
             var segment = await AddSegmentAsync(trip);
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.UpdateRouteAsync(other.Id, segment.Id, KrakowToRome()))
-                .Throws<NotFoundException>()
-                .WithMessage($"Trip segment with ID '{segment.Id}' was not found.");
+            // Act
+            var result = await _sut.UpdateRouteAsync(other.Id, segment.Id, KrakowToRome());
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo($"Trip segment with ID '{segment.Id}' was not found.");
 
             var stored = await ReloadSegmentAsync(segment.Id);
             await Assert.That(stored.Geometry.NumPoints).IsEqualTo(2);
@@ -377,20 +380,24 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenSegmentDoesNotExist_ShouldThrowNotFound()
+        public async Task UpdateRouteAsync_WhenSegmentDoesNotExist_ShouldReturnNotFound()
         {
             // Arrange
             var user = await AddUserAsync();
             var segmentId = Guid.NewGuid();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.UpdateRouteAsync(user.Id, segmentId, KrakowToRome()))
-                .Throws<NotFoundException>()
-                .WithMessage($"Trip segment with ID '{segmentId}' was not found.");
+            // Act
+            var result = await _sut.UpdateRouteAsync(user.Id, segmentId, KrakowToRome());
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo($"Trip segment with ID '{segmentId}' was not found.");
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenSegmentIsDeleted_ShouldThrowNotFound()
+        public async Task UpdateRouteAsync_WhenSegmentIsDeleted_ShouldReturnNotFound()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -399,13 +406,18 @@ namespace Tests.Services
             _context.TripSegments.Remove(segment);
             await _context.SaveChangesAsync();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome()))
-                .Throws<NotFoundException>();
+            // Act
+            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome());
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo($"Trip segment with ID '{segment.Id}' was not found.");
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenTripIsDeleted_ShouldThrowNotFoundAndKeepRoute()
+        public async Task UpdateRouteAsync_WhenTripIsDeleted_ShouldReturnNotFoundAndKeepRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -415,9 +427,14 @@ namespace Tests.Services
             await _context.SaveChangesAsync();
             _context.ChangeTracker.Clear();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome()))
-                .Throws<NotFoundException>();
+            // Act
+            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome());
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo($"Trip segment with ID '{segment.Id}' was not found.");
 
             var stored = await ReloadSegmentAsync(segment.Id);
             await Assert.That(stored.Geometry.NumPoints).IsEqualTo(2);

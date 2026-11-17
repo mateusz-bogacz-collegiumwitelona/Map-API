@@ -1,6 +1,5 @@
 using Domain.Common;
 using Domain.Const;
-using Domain.Exceptions;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -36,8 +35,17 @@ namespace Services.Services
             var segment = await _context.TripSegments
                 .Include(s => s.OriginPlace)
                 .Include(s => s.DestinationPlace)
-                .FirstOrDefaultAsync(s => s.Id == segmentId && s.Trip.UserId == userId, _ct)
-                ?? throw new NotFoundException($"Trip segment with ID '{segmentId}' was not found.");
+                .FirstOrDefaultAsync(s => s.Id == segmentId && s.Trip.UserId == userId, _ct);
+
+            if (segment == null)
+            {
+                _logger.LogWarning("Trip segment ID: {SegmentId} was not found for user ID: {UserId}", segmentId, userId);
+
+                return Result.Failure(
+                    message: $"Trip segment with ID '{segmentId}' was not found.",
+                    errorCode: ErrorCodes.NotFound,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
 
             var start = command.Coordinates[0];
             var end = command.Coordinates[^1];
