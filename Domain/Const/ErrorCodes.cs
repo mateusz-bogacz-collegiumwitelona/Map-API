@@ -47,6 +47,9 @@
 
         #region Trip
         public const string YearInvalid = "TRIP_001";
+        public const string RouteInvalid = "TRIP_008";
+        public const string DistanceInvalid = "TRIP_009";
+        public const string RouteEndpointsMismatch = "TRIP_010";
         #endregion
     }
 }

@@ -7,6 +7,7 @@
             services.AddSingleton<AuthMapper>();
             services.AddSingleton<UserMapper>();
             services.AddSingleton<ListMapper>();
+            services.AddSingleton<TripMapper>();
             return services;
         }
     }

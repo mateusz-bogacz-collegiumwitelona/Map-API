@@ -54,6 +54,7 @@ namespace Services.Services
                         .OrderBy(s => s.OrderIndex)
                         .Select(s => new TripRouteSegmentResponse
                         {
+                            SegmentId = s.Id,
                             OrderIndex = s.OrderIndex,
                             TransportType = s.TransportType,
                             DistanceKm = s.DistanceKm,
