@@ -31,6 +31,8 @@ namespace Tests.Services
 
         private UserManager<User> _userManager = null!;
 
+        private FakeEmailService _emailService = null!;
+
         [Before(Class)]
         public static async Task SetupClassAsync()
         {
@@ -104,12 +106,14 @@ namespace Tests.Services
                 null!,
                 new LoggerFactory().CreateLogger<UserManager<User>>());
 
+            _emailService = new FakeEmailService();
+
             _sut = new BanServices(
                 _context,
                 new LoggerFactory().CreateLogger<BanServices>(),
                 new FakeCancellationTokenAccessor(),
-                _userManager 
-                );
+                _userManager,
+                _emailService);
         }
 
         [After(Test)]
@@ -330,7 +334,7 @@ namespace Tests.Services
 
             await Assert.That(anyAgainstBystander).IsFalse();
         }
-        
+
         [Test]
         public async Task ReportUserAsync_WhenUserReportsThemselves_ShouldReturnBadRequestFailure()
         {
@@ -373,7 +377,7 @@ namespace Tests.Services
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
             await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidOperation);
         }
-        
+
         [Test]
         public async Task ReportUserAsync_WhenReportedUserDoesNotExist_ShouldReturnNotFoundFailure()
         {
@@ -1250,6 +1254,49 @@ namespace Tests.Services
             await Assert.That(untouchedOther.ResolvedAt).IsNull();
         }
 
+        [Test]
+        public async Task ResolveReportAsync_WhenBannedPermanently_ShouldSendPermanentBanNotificationEmail()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var report = await AddReportAsync(reported, reporter, reason: "Severe harassment");
+
+            var command = CreateResolveCommand(report.Id, isBanned: true, duration: null);
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var sentEmail = _emailService.SentEmails.SingleOrDefault(e => e.Type == FakeEmailService.AccountBannedNotificationType);
+            await Assert.That(sentEmail).IsNotNull();
+            await Assert.That(sentEmail!.To).IsEqualTo(reported.Email);
+            await Assert.That(sentEmail.Reason).IsEqualTo("Severe harassment");
+            await Assert.That(sentEmail.BannedUntil).IsNull();
+        }
+
+        [Test]
+        public async Task ResolveReportAsync_WhenRejected_ShouldNotSendBanNotificationEmail()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var reporter = await AddUserAsync("Adam", "Reporter");
+            var reported = await AddUserAsync("Anna", "Nowak");
+            var report = await AddReportAsync(reported, reporter, reason: "False report");
+
+            var command = CreateResolveCommand(report.Id, isBanned: false);
+
+            // Act
+            var result = await _sut.ResolveReportAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(_emailService.SentEmails).IsEmpty();
+        }
+
         #endregion
 
         #region UnbanUserAsync
@@ -1516,6 +1563,60 @@ namespace Tests.Services
             await Assert.That(updatedUser.BannedUntil).IsNull();
             await Assert.That(updatedUser.BannedReason).IsEqualTo("Permanent ban");
             await Assert.That(updatedUser.LockoutEnd).IsEqualTo(DateTimeOffset.MaxValue);
+        }
+
+        [Test]
+        public async Task BanUserAsync_WithTemporaryDuration_ShouldSendTemporaryBanNotificationEmail()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var target = await AddUserAsync("Anna", "Nowak");
+            var duration = TimeSpan.FromDays(5);
+
+            var command = new BanUserCommand
+            {
+                UserId = target.Id,
+                Reason = "Spam links",
+                Duration = duration
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var sentEmail = _emailService.SentEmails.SingleOrDefault(e => e.Type == FakeEmailService.AccountBannedNotificationType);
+            await Assert.That(sentEmail).IsNotNull();
+            await Assert.That(sentEmail!.To).IsEqualTo(target.Email);
+            await Assert.That(sentEmail.Reason).IsEqualTo("Spam links");
+            await Assert.That(sentEmail.BannedUntil).IsNotNull();
+        }
+
+        [Test]
+        public async Task BanUserAsync_WhenEmailServiceThrows_ShouldStillBanUserSuccessfully()
+        {
+            // Arrange
+            var admin = await AddUserAsync("Admin", "User");
+            var target = await AddUserAsync("Anna", "Nowak");
+            _emailService.ThrowOnSend = true;
+
+            var command = new BanUserCommand
+            {
+                UserId = target.Id,
+                Reason = "Direct ban despite SMTP failure",
+                Duration = null
+            };
+
+            // Act
+            var result = await _sut.BanUserAsync(command, admin.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var updatedUser = await _context.Users.AsNoTracking().SingleAsync(u => u.Id == target.Id);
+            await Assert.That(updatedUser.IsBanned).IsTrue();
+            await Assert.That(updatedUser.BannedReason).IsEqualTo("Direct ban despite SMTP failure");
         }
 
         #endregion

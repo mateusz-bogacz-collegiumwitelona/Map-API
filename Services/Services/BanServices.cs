@@ -25,6 +25,7 @@ namespace Services.Services
         private readonly ILogger<BanServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
         private readonly UserManager<User> _userManager;
+        private readonly IEmailService _emailService;
 
         private CancellationToken _ct => _ctAccessor.Token;
 
@@ -32,12 +33,14 @@ namespace Services.Services
             AppDbContext context,
             ILogger<BanServices> logger,
             ICancellationTokenAccessor ctAccessor,
-            UserManager<User> userManager)
+            UserManager<User> userManager,
+            IEmailService emailService)
         {
             _context = context;
             _logger = logger;
             _ctAccessor = ctAccessor;
             _userManager = userManager;
+            _emailService = emailService;
         }
 
         public async Task<Result> ReportUserAsync(ReportUserCommand command, Guid currentUserId)
@@ -152,7 +155,7 @@ namespace Services.Services
 
             if (report == null)
             {
-                _logger.LogWarning("Admin with id {adminId} want resolve report with id {reportId} with dosn't exist.", 
+                _logger.LogWarning("Admin with id {adminId} want resolve report with id {reportId} with dosn't exist.",
                     adminId, command.Id);
                 return Result.Failure(
                     message: "Report does not exist.",
@@ -178,7 +181,7 @@ namespace Services.Services
             if (!command.IsBanned)
             {
                 stateMachine.Reject(adminId);
-            } 
+            }
             else
             {
                 if (report.ReportedUser.HasActiveBan())
@@ -337,6 +340,23 @@ namespace Services.Services
             if (result.Succeeded)
             {
                 await _userManager.UpdateSecurityStampAsync(user);
+
+                if (!string.IsNullOrWhiteSpace(user.Email))
+                {
+                    try
+                    {
+                        await _emailService.SendAccountBannedNotificationAsync(
+                            user.Email,
+                            user.FirstName,
+                            reason,
+                            bannedUntil,
+                            _ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to send ban notification email to user {UserId}.", user.Id);
+                    }
+                }
             }
 
             return result;
