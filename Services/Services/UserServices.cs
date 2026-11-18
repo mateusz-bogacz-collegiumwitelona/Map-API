@@ -1,4 +1,5 @@
 ﻿using Domain.Common;
+using Domain.Const;
 using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
@@ -177,5 +178,62 @@ namespace Services.Services
                     UpdatedAt = u.UpdatedAt
                 })
             .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "UserList", _ct);
+
+        public async Task<Result<UserDetailResponse>> GetUserDetailAsync(Guid userId)
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Email,
+                    Role = _context.UserRoles
+                        .Where(ur => ur.UserId == u.Id)
+                        .Join(_context.Roles,
+                            ur => ur.RoleId,
+                            r => r.Id,
+                            (ur, r) => r.Name)
+                        .FirstOrDefault() ?? string.Empty,
+                    u.IsPublic,
+                    u.IsBanned
+                })
+                .FirstOrDefaultAsync(_ct);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result<UserDetailResponse>.Failure(
+                    message: $"User with ID '{userId}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.NotFound
+                );
+            }
+
+            if (string.IsNullOrWhiteSpace(user.Email))
+            {
+                _logger.LogError("Data integrity violation: User with ID {UserId} does not have an email address.", userId);
+                throw new InternalServerException("User email is required.");
+            }
+
+            var response = new UserDetailResponse
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Role = user.Role,
+                IsPublic = user.IsPublic,
+                IsBanned = user.IsBanned
+            };
+
+            return Result<UserDetailResponse>.Success(
+                message: "User details retrieved successfully.",
+                data: response,
+                statusCode: StatusCodes.Status200OK
+            );
+        }
     }
 }

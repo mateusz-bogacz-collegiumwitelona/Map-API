@@ -106,7 +106,7 @@ namespace Api.Controllers
             " last name, email, or role. By default, banned users and administrators are excluded unless explicitly " +
             "included via query flags. Available only for accounts with the Admin role.")]
         [ProducesResponseType(typeof(Result<PagedResult<UserListResponse>>), StatusCodes.Status200OK)]
-        [HttpDelete]
+        [HttpGet("list")]
         [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         public async Task<IActionResult> GetUserListAsnyc(
             [FromServices] IUserServices user,
@@ -115,6 +115,21 @@ namespace Api.Controllers
             )
         {
             var result = await user.GetUserListAsnyc(mapper.MapUserList(request));
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Retrieve detailed information about a specific user")]
+        [EndpointDescription("Returns detailed information about a specific user, " +
+            "including their ID, first name, last name, email, role, and account status. " +
+            "Available only for accounts with the Admin role.")]
+        [HttpGet("detail/{userId:guid}")]
+        [ProducesResponseType(typeof(Result<UserDetailResponse>), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserDetailAsync(
+            [FromServices] IUserServices user,
+            [FromRoute] Guid userId)
+        {
+            var result = await user.GetUserDetailAsync(userId);
             return HandleResult(result);
         }
     }

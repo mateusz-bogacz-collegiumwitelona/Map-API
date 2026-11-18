@@ -655,5 +655,129 @@ namespace Tests.Services
             await Assert.That(result.Data.Items.Count).IsEqualTo(2);
         }
         #endregion
+
+        #region GetUserDetailAsync
+        [Test]
+        public async Task GetUserDetailAsync_WhenUserExistsWithRole_ShouldReturnUserDetails()
+        {
+            // Arrange
+            var roleId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+
+            var role = new Microsoft.AspNetCore.Identity.IdentityRole<Guid>
+            {
+                Id = roleId,
+                Name = "Moderator",
+                NormalizedName = "MODERATOR"
+            };
+
+            var user = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                Email = "jan.kowalski@test.pl",
+                IsPublic = true,
+                IsBanned = false
+            };
+
+            await _contextMock.Roles.AddAsync(role);
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.UserRoles.AddAsync(new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid>
+            {
+                UserId = userId,
+                RoleId = roleId
+            });
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.GetUserDetailAsync(userId);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("User details retrieved successfully.");
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.Id).IsEqualTo(userId);
+            await Assert.That(result.Data.FirstName).IsEqualTo("Jan");
+            await Assert.That(result.Data.LastName).IsEqualTo("Kowalski");
+            await Assert.That(result.Data.Email).IsEqualTo("jan.kowalski@test.pl");
+            await Assert.That(result.Data.Role).IsEqualTo("Moderator");
+            await Assert.That(result.Data.IsPublic).IsTrue();
+            await Assert.That(result.Data.IsBanned).IsFalse();
+        }
+
+        [Test]
+        public async Task GetUserDetailAsync_WhenUserHasNoRole_ShouldReturnEmptyRoleString()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var user = new User
+            {
+                Id = userId,
+                FirstName = "Anna",
+                LastName = "Nowak",
+                Email = "anna.nowak@test.pl",
+                IsPublic = false,
+                IsBanned = true
+            };
+
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.GetUserDetailAsync(userId);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.Role).IsEqualTo(string.Empty);
+            await Assert.That(result.Data.IsPublic).IsFalse();
+            await Assert.That(result.Data.IsBanned).IsTrue();
+        }
+
+        [Test]
+        public async Task GetUserDetailAsync_WhenUserDoesNotExist_ShouldReturnNotFoundFailure()
+        {
+            // Arrange
+            var nonExistentUserId = Guid.NewGuid();
+
+            // Act
+            var result = await _userServicesMock.GetUserDetailAsync(nonExistentUserId);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(Domain.Const.ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo($"User with ID '{nonExistentUserId}' was not found.");
+            await Assert.That(result.Data).IsNull();
+        }
+
+        [Test]
+        [Arguments(null)]
+        [Arguments("")]
+        [Arguments("   ")]
+        public async Task GetUserDetailAsync_WhenUserEmailIsNullOrWhitespace_ShouldThrowInternalServerException(string? invalidEmail)
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var corruptedUser = new User
+            {
+                Id = userId,
+                FirstName = "Piotr",
+                LastName = "Uszkodzony",
+                Email = invalidEmail
+            };
+
+            await _contextMock.Users.AddAsync(corruptedUser);
+            await _contextMock.SaveChangesAsync();
+
+            // Act & Assert
+            await Assert.That(async () => await _userServicesMock.GetUserDetailAsync(userId))
+                .Throws<InternalServerException>()
+                .WithMessage("User email is required.");
+        }
+        #endregion
     }
 }

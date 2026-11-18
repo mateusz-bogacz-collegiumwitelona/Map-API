@@ -11,6 +11,6 @@ namespace Services.Interfaces
         Task<Result> EditUserAsync(Guid userId, EditUserCommand command, CancellationToken ct = default);
         Task<Result> SetProfileVisibilityAsync(Guid userId, bool isPublic, CancellationToken ct = default);
         Task<Result<PagedResult<UserListResponse>>> GetUserListAsnyc(UserListCommand command);
-
+        Task<Result<UserDetailResponse>> GetUserDetailAsync(Guid userId);
     }
 }
