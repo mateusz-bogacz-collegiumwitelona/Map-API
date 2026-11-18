@@ -1,7 +1,6 @@
 ﻿using Domain.Common;
 using Domain.Const;
 using Domain.Enum;
-using Domain.Exceptions;
 using Domain.Models;
 using Domain.State;
 using Infrastructure;
@@ -17,7 +16,6 @@ using Services.Interfaces;
 using Services.Interfaces.Auth;
 using Services.QueryExtension;
 using Services.Response.Ban;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Services.Services
 {
@@ -128,7 +126,7 @@ namespace Services.Services
                     ReportedUserId = ur.ReportedUserId,
                     ReportedFirstName = ur.ReportedUser.FirstName,
                     ReportedLastName = ur.ReportedUser.LastName,
-                    
+
                     ReporterUserId = ur.ReporterUserId,
                     ReporterFirstName = ur.ReporterUser.FirstName,
                     ReporterLastName = ur.ReporterUser.LastName,

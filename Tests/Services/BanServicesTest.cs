@@ -1,7 +1,6 @@
 ﻿using Domain.Const;
 using Domain.Enum;
 using Domain.Models;
-using DotNet.Testcontainers.Builders;
 using Infrastructure;
 using Infrastructure.Interceptors;
 using Microsoft.AspNetCore.Http;
@@ -37,7 +36,7 @@ namespace Tests.Services
 
         private FakeEmailService _emailService = null!;
 
-        private  ITokenService _tokenService = null!;
+        private ITokenService _tokenService = null!;
 
         [Before(Class)]
         public static async Task SetupClassAsync()
@@ -1248,7 +1247,7 @@ namespace Tests.Services
                 "Anna",
                 "Nowak",
                 isBanned: true,
-                bannedUntil: DateTime.UtcNow.AddDays(-1), 
+                bannedUntil: DateTime.UtcNow.AddDays(-1),
                 bannedReason: "Old expired ban");
             var report = await AddReportAsync(reported, reporter, reason: "Repeat offense");
 
