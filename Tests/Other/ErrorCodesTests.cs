@@ -29,6 +29,14 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.LastNameInvalid).IsEqualTo("USR_002");
             await Assert.That(ErrorCodes.BioInvalid).IsEqualTo("USR_003");
             await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
+            await Assert.That(ErrorCodes.TripTitleInvalid).IsEqualTo("TRIP_002");
+            await Assert.That(ErrorCodes.TripDescriptionInvalid).IsEqualTo("TRIP_003");
+            await Assert.That(ErrorCodes.TripDateRangeInvalid).IsEqualTo("TRIP_004");
+            await Assert.That(ErrorCodes.TripSegmentsInvalid).IsEqualTo("TRIP_005");
+            await Assert.That(ErrorCodes.TripPointInvalid).IsEqualTo("TRIP_006");
+            await Assert.That(ErrorCodes.TripTransportTypeInvalid).IsEqualTo("TRIP_007");
+
+            await Assert.That(ErrorCodes.PlaceSearchQueryInvalid).IsEqualTo("PLACE_001");
         }
 
         [Test]
@@ -54,7 +62,14 @@ namespace Tests.Other
                 ErrorCodes.FirstNameInvalid,
                 ErrorCodes.LastNameInvalid,
                 ErrorCodes.BioInvalid,
-                ErrorCodes.YearInvalid
+                ErrorCodes.YearInvalid,
+                ErrorCodes.TripTitleInvalid,
+                ErrorCodes.TripDescriptionInvalid,
+                ErrorCodes.TripDateRangeInvalid,
+                ErrorCodes.TripSegmentsInvalid,
+                ErrorCodes.TripPointInvalid,
+                ErrorCodes.TripTransportTypeInvalid,
+                ErrorCodes.PlaceSearchQueryInvalid
             };
 
             await Assert.That(codes.Distinct().Count()).IsEqualTo(codes.Length);

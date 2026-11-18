@@ -47,6 +47,16 @@
 
         #region Trip
         public const string YearInvalid = "TRIP_001";
+        public const string TripTitleInvalid = "TRIP_002";
+        public const string TripDescriptionInvalid = "TRIP_003";
+        public const string TripDateRangeInvalid = "TRIP_004";
+        public const string TripSegmentsInvalid = "TRIP_005";
+        public const string TripPointInvalid = "TRIP_006";
+        public const string TripTransportTypeInvalid = "TRIP_007";
+        #endregion
+
+        #region Place
+        public const string PlaceSearchQueryInvalid = "PLACE_001";
         #endregion
     }
 }

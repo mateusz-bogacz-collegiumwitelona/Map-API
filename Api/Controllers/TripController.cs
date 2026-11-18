@@ -5,6 +5,7 @@ using Api.Request.Trip;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Services.Command.Trip;
 using Services.Interfaces;
 using Services.Response.Trip;
 
@@ -23,7 +24,11 @@ namespace Api.Controllers
             [FromQuery] TripFilterRequest request,
             [FromServices] ITripServices trips)
         {
-            var result = await trips.GetTripRoutesAsync(CurrentUserId, request.UserId, request.Year);
+            var result = await trips.GetTripRoutesAsync(
+                CurrentUserId,
+                request.UserId,
+                request.Year);
+
             return HandleResult(result);
         }
 
@@ -36,7 +41,11 @@ namespace Api.Controllers
             [FromQuery] TripFilterRequest request,
             [FromServices] ITripServices trips)
         {
-            var result = await trips.GetVisitedCountriesAsync(CurrentUserId, request.UserId, request.Year);
+            var result = await trips.GetVisitedCountriesAsync(
+                CurrentUserId,
+                request.UserId,
+                request.Year);
+
             return HandleResult(result);
         }
 
@@ -48,11 +57,96 @@ namespace Api.Controllers
         public async Task<IActionResult> GetUserTripsAsync(
             [FromServices] ITripServices trips,
             [FromServices] ListMapper mapper,
-            [FromQuery] BasicListRequest request
-            )
+            [FromQuery] BasicListRequest request)
         {
-            var result = await trips.GetUserTripsAsync(mapper.MapBasicList(request), CurrentUserId);
+            var result = await trips.GetUserTripsAsync(
+                mapper.MapBasicList(request),
+                CurrentUserId);
+
             return HandleResult(result);
+        }
+
+        [EndpointSummary("Get details of a trip")]
+        [EndpointDescription("Returns the complete trip details, including description, dates and ordered segments with endpoint names and coordinates. Only the trip owner can access it. Returns 404 when the trip does not exist or belongs to another user.")]
+        [ProducesResponseType(typeof(Result<TripDetailsResponse>), StatusCodes.Status200OK)]
+        [HttpGet("details/{tripId:guid}")]
+        [Authorize]
+        public async Task<IActionResult> GetTripDetailsAsync(
+            [FromRoute] Guid tripId,
+            [FromServices] ITripServices trips)
+        {
+            var result = await trips.GetTripDetailsAsync(CurrentUserId, tripId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Create a trip")]
+        [EndpointDescription("Creates a trip for the authenticated user with its header and ordered route segments. Segment order follows the order in the request. Returns 201 when created and 400 when the date range, route points or segment list is invalid.")]
+        [ProducesResponseType(typeof(Result<TripDetailsResponse>), StatusCodes.Status201Created)]
+        [HttpPost("create")]
+        [Authorize]
+        public async Task<IActionResult> CreateTripAsync(
+            [FromBody] UpsertTripRequest request,
+            [FromServices] ITripServices trips)
+        {
+            var result = await trips.CreateTripAsync(
+                CurrentUserId,
+                ToCommand(request));
+
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Update a trip")]
+        [EndpointDescription("Replaces the header and ordered segments of a trip owned by the authenticated user. The update and visited-country synchronization are performed atomically. Returns 400 when the request is invalid and 404 when the trip does not exist or belongs to another user.")]
+        [ProducesResponseType(typeof(Result<TripDetailsResponse>), StatusCodes.Status200OK)]
+        [HttpPut("update/{tripId:guid}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateTripAsync(
+            [FromRoute] Guid tripId,
+            [FromBody] UpsertTripRequest request,
+            [FromServices] ITripServices trips)
+        {
+            var result = await trips.UpdateTripAsync(
+                CurrentUserId,
+                tripId,
+                ToCommand(request));
+
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Delete a trip")]
+        [EndpointDescription("Soft-deletes a trip owned by the authenticated user and its active segments. It removes the trip's visited-country associations while preserving countries supported by other trips. Returns 404 when the trip does not exist or belongs to another user.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [HttpDelete("delete/{tripId:guid}")]
+        [Authorize]
+        public async Task<IActionResult> DeleteTripAsync(
+            [FromRoute] Guid tripId,
+            [FromServices] ITripServices trips)
+        {
+            var result = await trips.DeleteTripAsync(CurrentUserId, tripId);
+            return HandleResult(result);
+        }
+
+        private static UpsertTripCommand ToCommand(UpsertTripRequest request)
+        {
+            var segments = request.Segments
+                .Select(segment => new TripSegmentCommand(
+                    new TripPointCommand(
+                        segment.Origin.Name,
+                        segment.Origin.Latitude,
+                        segment.Origin.Longitude),
+                    new TripPointCommand(
+                        segment.Destination.Name,
+                        segment.Destination.Latitude,
+                        segment.Destination.Longitude),
+                    segment.TransportType))
+                .ToList();
+
+            return new UpsertTripCommand(
+                request.Title,
+                request.Description,
+                request.StartDate,
+                request.EndDate,
+                segments);
         }
     }
 }
