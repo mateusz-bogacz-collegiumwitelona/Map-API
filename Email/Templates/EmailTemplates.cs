@@ -92,6 +92,41 @@ namespace Email.Templates
             return new EmailContent(subject, html, text);
         }
 
+        public static EmailContent AccountBannedNotification(string firstName, string reason, DateTime? bannedUntil)
+        {
+            const string subject = "Your account has been suspended";
+
+            var durationHtml = bannedUntil.HasValue
+                ? $"until <strong>{bannedUntil.Value:yyyy-MM-dd HH:mm} UTC</strong>"
+                : "<strong>permanently</strong>";
+
+            var durationText = bannedUntil.HasValue
+                ? $"until {bannedUntil.Value:yyyy-MM-dd HH:mm} UTC"
+                : "permanently";
+
+            var html = Layout(subject, $"""
+                <p>Hi {Encode(firstName)},</p>
+                <p>Your Map account has been suspended {durationHtml}.</p>
+                <p><strong>Reason:</strong> {Encode(reason)}</p>
+                <p>While the suspension is active, you will not be able to sign in or access your account.</p>
+                <p>If you believe this is a mistake, contact support.</p>
+                """);
+
+            var text = $"""
+                Hi {firstName},
+
+                Your Map account has been suspended {durationText}.
+
+                Reason: {reason}
+
+                While the suspension is active, you will not be able to sign in or access your account.
+
+                If you believe this is a mistake, contact support.
+                """;
+
+            return new EmailContent(subject, html, text);
+        }
+
         private static string Encode(string value)
             => WebUtility.HtmlEncode(value);
     }

@@ -37,6 +37,11 @@
         public const string EmailTaken = "USR_005";
         public const string EmailUnchanged = "USR_006";
         public const string EmailAlreadyExist = "USR_007";
+        public const string UserNotFound = "USR_008";
+        #endregion
+
+        #region Trip
+        public const string YearInvalid = "TRIP_001";
         #endregion
 
         #region Verification
@@ -45,8 +50,16 @@
         public const string AttemptsExceeded = "VER_003";
         #endregion
 
-        #region Trip
-        public const string YearInvalid = "TRIP_001";
+        #region Ban / Report
+        public const string ReportEmpty = "BAN_001";
+        public const string ReportTooLong = "BAN_002";
+        public const string ReportTooShort = "BAN_003";
+        public const string ReportNotFound = "BAN_004";
+        public const string ReportAlreadyResolved = "BAN_005";
+        public const string UserAlreadyBanned = "BAN_006";
+        public const string BanDurationInvalid = "BAN_007";
+        public const string BanDurationNotAllowed = "BAN_008";
+        public const string UserNotBanned = "BAN_009";
         #endregion
     }
 }

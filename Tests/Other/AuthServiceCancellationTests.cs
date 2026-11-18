@@ -2,7 +2,7 @@ using Domain.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
 using Services.Accessors.Interfaces;
-using Services.Commands.Auth;
+using Services.Command.Auth;
 using Services.Interfaces.Auth;
 using Services.Services.Auth;
 using Tests.Fakes;

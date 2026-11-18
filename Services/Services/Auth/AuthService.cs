@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
-using Services.Commands.Auth;
+using Services.Command.Auth;
 using Services.Interfaces.Auth;
 using Services.Response.Auth;
 
@@ -73,10 +73,9 @@ namespace Services.Services.Auth
 
             await _userManager.ResetAccessFailedCountAsync(user);
 
-            if (IsBanned(user))
+            if (await EnsureUserIsNotBannedAsync(user, revokeRefreshTokens: false, token) is { } banResult)
             {
-                _logger.LogWarning("Login attempt failed for banned user with email: {Email}", command.Email);
-                return AccountBanned();
+                return banResult;
             }
 
             if (!user.EmailConfirmed)
@@ -103,11 +102,9 @@ namespace Services.Services.Auth
                 return InvalidRefreshToken();
             }
 
-            if (IsBanned(consumedToken.User))
+            if (await EnsureUserIsNotBannedAsync(consumedToken.User, revokeRefreshTokens: true, token) is { } banResult)
             {
-                _logger.LogWarning("Refresh token attempt failed for banned user with ID: {UserId}", consumedToken.User.Id);
-                await _tokenService.RevokeAllUserRefreshTokensAsync(consumedToken.User.Id, token);
-                return AccountBanned();
+                return banResult;
             }
 
             if (!consumedToken.User.EmailConfirmed)
@@ -159,9 +156,6 @@ namespace Services.Services.Auth
                 errorCode: ErrorCodes.AccountBanned,
                 statusCode: StatusCodes.Status403Forbidden);
 
-        private static bool IsBanned(User user)
-            => user.IsBanned && (user.BannedUntil is null || user.BannedUntil > DateTime.UtcNow);
-
         private async Task<Result<AuthResponse>> CreateAuthResponseAsync(User user, CancellationToken cancellationToken)
         {
             var roles = await _userManager.GetRolesAsync(user);
@@ -190,5 +184,34 @@ namespace Services.Services.Auth
                 message: "Email address is not confirmed.",
                 errorCode: ErrorCodes.EmailNotConfirmed,
                 statusCode: StatusCodes.Status403Forbidden);
+
+        private async Task<Result<AuthResponse>?> EnsureUserIsNotBannedAsync(
+            User user,
+            bool revokeRefreshTokens,
+            CancellationToken cancellationToken)
+        {
+            if (!user.IsBanned)
+            {
+                return null;
+            }
+
+            if (user.HasActiveBan())
+            {
+                _logger.LogWarning("Authentication attempt failed for banned user with ID: {UserId}", user.Id);
+
+                if (revokeRefreshTokens)
+                {
+                    await _tokenService.RevokeAllUserRefreshTokensAsync(user.Id, cancellationToken);
+                }
+
+                return AccountBanned();
+            }
+
+            user.Unban();
+            await _userManager.UpdateAsync(user);
+            _logger.LogInformation("Expired ban automatically lifted for user with ID: {UserId}", user.Id);
+
+            return null;
+        }
     }
 }

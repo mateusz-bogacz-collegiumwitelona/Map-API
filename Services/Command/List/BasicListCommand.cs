@@ -1,6 +1,6 @@
 ﻿namespace Services.Command.List
 {
-    public sealed record BasicListCommand
+    public record BasicListCommand
     {
         public int? PageNumber { get; init; }
         public int? PageSize { get; init; }
