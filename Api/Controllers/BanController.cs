@@ -6,6 +6,7 @@ using Api.Request.List;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Services.Interfaces;
 using Services.Response.Ban;
 
@@ -22,11 +23,12 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(Result), StatusCodes.Status201Created)]
         [HttpPost("report")]
         [Authorize]
+        [EnableRateLimiting(RateLimitingConfiguration.ReportPolicy)]
         public async Task<IActionResult> ReportUserAsync(
             [FromBody] ReportUserRequest request,
             [FromServices] IBanServices ban,
             [FromServices] BanMapper mapper
-            )
+        )
         {
             var result = await ban.ReportUserAsync(mapper.ToReport(request), CurrentUserId);
             return HandleResult(result);
