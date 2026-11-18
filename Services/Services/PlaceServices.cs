@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
 using Services.Interfaces;
 using Services.Response.Place;
+using Services.QueryExtension;
 
 namespace Services.Services
 {
@@ -17,6 +18,7 @@ namespace Services.Services
         private readonly AppDbContext _context;
         private readonly ILogger<PlaceServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+
 
         public PlaceServices(
             AppDbContext context,
@@ -31,19 +33,9 @@ namespace Services.Services
         public async Task<Result<List<PlaceSearchResponse>>> SearchPlacesAsync(
             string query)
         {
-            if (string.IsNullOrWhiteSpace(query) ||
-                query.Trim().Length < 2 ||
-                query.Trim().Length > 100)
-            {
-                throw new ArgumentException(
-                    "Search query must contain between 2 and 100 characters.");
-            }
-
-            var searchPattern = $"{query.Trim()}%";
-
             var places = await _context.Places
                 .AsNoTracking()
-                .Where(place => EF.Functions.ILike(place.Name, searchPattern))
+                .ApplySearch(query)
                 .OrderBy(place => place.Name)
                 .ThenBy(place => place.Country.Name)
                 .Take(MaxResults)

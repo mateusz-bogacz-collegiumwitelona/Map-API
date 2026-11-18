@@ -73,7 +73,7 @@ namespace Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetTripDetailsAsync(
             [FromRoute] Guid tripId,
-            [FromServices] ITripManagementServices trips)
+            [FromServices] ITripServices trips)
         {
             var result = await trips.GetTripDetailsAsync(CurrentUserId, tripId);
             return HandleResult(result);
@@ -86,7 +86,7 @@ namespace Api.Controllers
         [Authorize]
         public async Task<IActionResult> CreateTripAsync(
             [FromBody] UpsertTripRequest request,
-            [FromServices] ITripManagementServices trips)
+            [FromServices] ITripServices trips)
         {
             var result = await trips.CreateTripAsync(
                 CurrentUserId,
@@ -103,7 +103,7 @@ namespace Api.Controllers
         public async Task<IActionResult> UpdateTripAsync(
             [FromRoute] Guid tripId,
             [FromBody] UpsertTripRequest request,
-            [FromServices] ITripManagementServices trips)
+            [FromServices] ITripServices trips)
         {
             var result = await trips.UpdateTripAsync(
                 CurrentUserId,
@@ -120,7 +120,7 @@ namespace Api.Controllers
         [Authorize]
         public async Task<IActionResult> DeleteTripAsync(
             [FromRoute] Guid tripId,
-            [FromServices] ITripManagementServices trips)
+            [FromServices] ITripServices trips)
         {
             var result = await trips.DeleteTripAsync(CurrentUserId, tripId);
             return HandleResult(result);

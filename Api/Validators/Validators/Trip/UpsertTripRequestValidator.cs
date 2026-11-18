@@ -22,21 +22,19 @@ namespace Api.Validators.Validators.Trip
             RuleFor(x => x.EndDate)
                 .Must((request, endDate) =>
                     !endDate.HasValue || endDate.Value >= request.StartDate)
-                .WithErrorCode(ErrorCodes.TripDateRangeInvalid)
-                .WithMessage("End date cannot be earlier than start date.");
+                .WithErrorCode(ErrorCodes.TripDateRangeInvalid);
 
             RuleFor(x => x.Segments)
                 .Cascade(CascadeMode.Stop)
                 .NotNull()
                 .WithErrorCode(ErrorCodes.TripSegmentsInvalid)
                 .NotEmpty()
-                .WithErrorCode(ErrorCodes.TripSegmentsInvalid)
-                .WithMessage("A trip must contain at least one segment.");
+                .WithErrorCode(ErrorCodes.TripSegmentsInvalid);
+
 
             RuleFor(x => x.Segments)
                 .Must(HaveContinuousSegments)
-                .WithErrorCode(ErrorCodes.TripSegmentsInvalid)
-                .WithMessage("Each segment must start where the previous segment ends.");
+                .WithErrorCode(ErrorCodes.TripSegmentsInvalid);
 
             RuleForEach(x => x.Segments)
                 .SetValidator(new TripSegmentRequestValidator());

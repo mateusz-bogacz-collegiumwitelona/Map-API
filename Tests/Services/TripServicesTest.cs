@@ -583,10 +583,14 @@ namespace Tests.Services
             var target = await AddUserAsync(isPublic: false);
             await AddTripAsync(target, Utc(2025, 1, 1));
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetTripRoutesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{target.Id}' was not found.");
+            // Act
+            var result = await _sut.GetTripRoutesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -596,10 +600,14 @@ namespace Tests.Services
             var requester = await AddUserAsync();
             var targetId = Guid.NewGuid();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetTripRoutesAsync(requester.Id, targetId))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{targetId}' was not found.");
+            // Act
+            var result = await _sut.GetTripRoutesAsync(requester.Id, targetId);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -613,9 +621,14 @@ namespace Tests.Services
             _context.Remove(target);
             await _context.SaveChangesAsync();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetTripRoutesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>();
+            // Act
+            var result = await _sut.GetTripRoutesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
         #endregion
 
@@ -1055,10 +1068,14 @@ namespace Tests.Services
             var trip = await AddTripAsync(target, Utc(2025, 1, 1));
             await AddVisitAsync(trip, _poland);
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{target.Id}' was not found.");
+            // Act
+            var result = await _sut.GetVisitedCountriesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -1068,10 +1085,14 @@ namespace Tests.Services
             var requester = await AddUserAsync();
             var targetId = Guid.NewGuid();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, targetId))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{targetId}' was not found.");
+            // Act
+            var result = await _sut.GetVisitedCountriesAsync(requester.Id, targetId);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -1086,18 +1107,23 @@ namespace Tests.Services
             _context.Remove(target);
             await _context.SaveChangesAsync();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>();
+            // Act
+            var result = await _sut.GetVisitedCountriesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
         #endregion
 
         #region Trip management
-        private ITripManagementServices CreateManagementService()
+        private ITripServices CreateManagementService()
         {
-            return new TripManagementServices(
+            return new TripServices(
                 _context,
-                new LoggerFactory().CreateLogger<TripManagementServices>(),
+                new LoggerFactory().CreateLogger<TripServices>(),
                 new FakeCancellationTokenAccessor());
         }
 
@@ -1200,47 +1226,6 @@ namespace Tests.Services
                 .ToListAsync();
 
             await Assert.That(visits.Count).IsEqualTo(2);
-        }
-
-        [Test]
-        public async Task CreateTripAsync_WhenSegmentsAreDiscontinuous_ShouldRejectTrip()
-        {
-            // Arrange
-            await SetDistinctCountryBoundariesAsync();
-
-            var user = await AddUserAsync();
-            var service = CreateManagementService();
-            var command = new UpsertTripCommand(
-                "Nieciągła trasa",
-                null,
-                Utc(2025, 6, 1),
-                null,
-                new[]
-                {
-            CreateTripSegment(
-                CreateTripPoint("Kraków", 50.0647, 19.945),
-                CreateTripPoint("Rzym", 41.9028, 12.4964)),
-            CreateTripSegment(
-                CreateTripPoint("Warszawa", 52.2297, 21.0122),
-                CreateTripPoint("Kraków", 50.0647, 19.945),
-                TransportTypeEnum.Train)
-                });
-
-            // Act & Assert
-            await Assert.That(async () => await service.CreateTripAsync(user.Id, command))
-                .Throws<ArgumentException>();
-
-            var trips = await _context.Trips
-                .AsNoTracking()
-                .Where(trip => trip.UserId == user.Id)
-                .ToListAsync();
-
-            var segments = await _context.TripSegments
-                .AsNoTracking()
-                .ToListAsync();
-
-            await Assert.That(trips).IsEmpty();
-            await Assert.That(segments).IsEmpty();
         }
 
         [Test]
@@ -1427,7 +1412,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateAndDeleteTripAsync_WhenUserDoesNotOwnTrip_ShouldThrowNotFoundException()
+        public async Task TripManagementAsync_WhenUserDoesNotOwnTrip_ShouldReturnNotFoundResults()
         {
             // Arrange
             await SetDistinctCountryBoundariesAsync();
@@ -1450,6 +1435,8 @@ namespace Tests.Services
                             CreateTripPoint("Rzym", 41.9028, 12.4964))
                     }));
 
+            var tripId = trip.Data!.Id;
+
             var updateCommand = new UpsertTripCommand(
                 "Zmiana",
                 null,
@@ -1462,28 +1449,49 @@ namespace Tests.Services
                         CreateTripPoint("Warszawa", 52.2297, 21.0122))
                 });
 
-            // Act & Assert
-            await Assert.That(async () => await service.UpdateTripAsync(
-                    otherUser.Id,
-                    trip.Data!.Id,
-                    updateCommand))
-                .Throws<NotFoundException>();
+            // Act
+            var updateResult = await service.UpdateTripAsync(
+                otherUser.Id,
+                tripId,
+                updateCommand);
 
-            await Assert.That(async () => await service.DeleteTripAsync(
-                    otherUser.Id,
-                    trip.Data!.Id))
-                .Throws<NotFoundException>();
+            var detailsResult = await service.GetTripDetailsAsync(
+                otherUser.Id,
+                tripId);
+
+            var deleteResult = await service.DeleteTripAsync(
+                otherUser.Id,
+                tripId);
+
+            // Assert
+            await Assert.That(updateResult.IsSuccess).IsFalse();
+            await Assert.That(updateResult.StatusCode)
+                .IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(updateResult.ErrorCode)
+                .IsEqualTo(ErrorCodes.NotFound);
+
+            await Assert.That(detailsResult.IsSuccess).IsFalse();
+            await Assert.That(detailsResult.StatusCode)
+                .IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(detailsResult.ErrorCode)
+                .IsEqualTo(ErrorCodes.NotFound);
+
+            await Assert.That(deleteResult.IsSuccess).IsFalse();
+            await Assert.That(deleteResult.StatusCode)
+                .IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(deleteResult.ErrorCode)
+                .IsEqualTo(ErrorCodes.NotFound);
 
             var storedTrip = await _context.Trips
                 .AsNoTracking()
-                .SingleAsync(item => item.Id == trip.Data!.Id);
+                .SingleAsync(item => item.Id == tripId);
 
             await Assert.That(storedTrip.Title).IsEqualTo("Prywatna podróż");
             await Assert.That(storedTrip.IsDeleted).IsFalse();
         }
 
         [Test]
-        public async Task CreateTripAsync_WhenPointHasNoCountry_ShouldRollbackAllWrites()
+        public async Task CreateTripAsync_WhenPointHasNoCountry_ShouldReturnFailureAndRollbackAllWrites()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -1501,9 +1509,15 @@ namespace Tests.Services
                         CreateTripPoint("Punkt poza krajami", 10, 10))
                 });
 
-            // Act & Assert
-            await Assert.That(async () => await service.CreateTripAsync(user.Id, command))
-                .Throws<ArgumentException>();
+            // Act
+            var result = await service.CreateTripAsync(user.Id, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode)
+                .IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode)
+                .IsEqualTo(ErrorCodes.TripPointInvalid);
 
             var trips = await _context.Trips
                 .IgnoreQueryFilters()
@@ -1531,7 +1545,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateTripAsync_WhenPointHasNoCountry_ShouldRollbackPreviousChanges()
+        public async Task UpdateTripAsync_WhenPointHasNoCountry_ShouldReturnFailureAndRollbackPreviousChanges()
         {
             // Arrange
             await SetDistinctCountryBoundariesAsync();
@@ -1553,6 +1567,8 @@ namespace Tests.Services
                             CreateTripPoint("Rzym", 41.9028, 12.4964))
                     }));
 
+            var tripId = trip.Data!.Id;
+
             var updateCommand = new UpsertTripCommand(
                 "Nazwa po zmianie",
                 null,
@@ -1565,26 +1581,32 @@ namespace Tests.Services
                         CreateTripPoint("Punkt poza krajami", 10, 10))
                 });
 
-            // Act & Assert
-            await Assert.That(async () => await service.UpdateTripAsync(
-                    user.Id,
-                    trip.Data!.Id,
-                    updateCommand))
-                .Throws<ArgumentException>();
+            // Act
+            var result = await service.UpdateTripAsync(
+                user.Id,
+                tripId,
+                updateCommand);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode)
+                .IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode)
+                .IsEqualTo(ErrorCodes.TripPointInvalid);
 
             var storedTrip = await _context.Trips
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .SingleAsync(item => item.Id == trip.Data!.Id);
+                .SingleAsync(item => item.Id == tripId);
 
             var activeSegments = await _context.TripSegments
                 .AsNoTracking()
-                .Where(segment => segment.TripId == trip.Data!.Id)
+                .Where(segment => segment.TripId == tripId)
                 .ToListAsync();
 
             var visits = await _context.VisitedCountries
                 .AsNoTracking()
-                .Where(visit => visit.TripId == trip.Data!.Id)
+                .Where(visit => visit.TripId == tripId)
                 .ToListAsync();
 
             await Assert.That(storedTrip.Title).IsEqualTo("Nazwa przed zmianą");

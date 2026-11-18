@@ -8,14 +8,4 @@ namespace Services.Command.Trip
         DateTime StartDate,
         DateTime? EndDate,
         IReadOnlyList<TripSegmentCommand> Segments);
-
-    public sealed record TripSegmentCommand(
-        TripPointCommand Origin,
-        TripPointCommand Destination,
-        TransportTypeEnum TransportType);
-
-    public sealed record TripPointCommand(
-        string Name,
-        double Latitude,
-        double Longitude);
 }
