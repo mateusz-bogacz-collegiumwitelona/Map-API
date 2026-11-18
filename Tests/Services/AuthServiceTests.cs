@@ -410,8 +410,8 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
-            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.AccountBanned);
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidCredentials);
             await Assert.That(result.Data).IsNull();
         }
 

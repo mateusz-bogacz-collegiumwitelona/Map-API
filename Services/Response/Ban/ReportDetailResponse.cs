@@ -6,9 +6,11 @@ namespace Services.Response.Ban
     {
         public required Guid Id { get; init; }
 
+        public required Guid ReportedUserId { get; init; }
         public required string ReportedFirstName { get; init; }
         public required string ReportedLastName { get; init; }
 
+        public required Guid ReporterUserId { get; init; }
         public required string ReporterFirstName { get; init; }
         public required string ReporterLastName { get; init; }
 
@@ -16,6 +18,7 @@ namespace Services.Response.Ban
 
         public ReportStatusEnum Status { get; init; }
 
+        public Guid? ResolvedByAdminId { get; init; }
         public string? ResolvedByAdminFirstName { get; init; }
         public string? ResolvedByAdminLastName { get; init; }
 

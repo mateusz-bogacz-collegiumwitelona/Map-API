@@ -125,15 +125,18 @@ namespace Services.Services
                 {
                     Id = ur.Id,
 
+                    ReportedUserId = ur.ReportedUserId,
                     ReportedFirstName = ur.ReportedUser.FirstName,
                     ReportedLastName = ur.ReportedUser.LastName,
-
+                    
+                    ReporterUserId = ur.ReporterUserId,
                     ReporterFirstName = ur.ReporterUser.FirstName,
                     ReporterLastName = ur.ReporterUser.LastName,
 
                     Reason = ur.Reason,
                     Status = ur.Status,
 
+                    ResolvedByAdminId = ur.ResolvedByAdminId,
                     ResolvedByAdminFirstName = ur.ResolvedByAdmin != null
                         ? ur.ResolvedByAdmin.FirstName
                         : null,

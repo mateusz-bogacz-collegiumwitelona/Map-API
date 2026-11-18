@@ -51,12 +51,6 @@ namespace Services.Services.Auth
                 return InvalidCredentials();
             }
 
-            if (user.HasActiveBan())
-            {
-                _logger.LogWarning("Login attempt failed for banned user with email: {Email}", command.Email);
-                return AccountBanned();
-            }
-
             if (await _userManager.IsLockedOutAsync(user))
             {
                 _logger.LogWarning("Login attempt failed for locked out user with email: {Email}", command.Email);
@@ -79,7 +73,7 @@ namespace Services.Services.Auth
 
             await _userManager.ResetAccessFailedCountAsync(user);
 
-            if (IsBanned(user))
+            if (user.HasActiveBan())
             {
                 _logger.LogWarning("Login attempt failed for banned user with email: {Email}", command.Email);
                 return AccountBanned();
