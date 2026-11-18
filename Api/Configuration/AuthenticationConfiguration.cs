@@ -74,7 +74,8 @@ namespace Api.Configuration
                 .Where(u => u.Id == parsedUserId)
                 .Select(u => new
                 {
-                    IsBanned = u.IsBanned && (u.BannedUntil == null || u.BannedUntil > now)
+                    u.IsBanned,
+                    u.BannedUntil
                 })
                 .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
 
@@ -86,6 +87,19 @@ namespace Api.Configuration
 
             if (userStatus.IsBanned)
             {
+                if (userStatus.BannedUntil is not null && userStatus.BannedUntil <= now)
+                {
+                    await dbContext.Users
+                        .Where(u => u.Id == parsedUserId && u.IsBanned)
+                        .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(u => u.IsBanned, false)
+                            .SetProperty(u => u.BannedUntil, (DateTime?)null)
+                            .SetProperty(u => u.BannedReason, (string?)null),
+                            context.HttpContext.RequestAborted);
+
+                    return;
+                }
+
                 context.HttpContext.Items[AccountBannedItemKey] = true;
                 context.Fail("User account is banned.");
             }
