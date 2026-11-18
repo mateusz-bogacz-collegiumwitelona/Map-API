@@ -147,5 +147,23 @@ namespace Api.Controllers
             var result = await user.GetUserBanDetailAsync(userId);
             return HandleResult(result);
         }
+
+        [EndpointSummary("Retrieve a paginated list of reports associated with a specific user")]
+        [EndpointDescription("Returns a paginated and sorting list of reports associated with a specific user, " +
+            "including details such as report ID, type, status, and creation date. " +
+            "Available only for accounts with the Admin role.")]
+        [HttpGet("detail/{userId:guid}/report")]
+        [ProducesResponseType(typeof(Result<PagedResult<UserReportListRespone>>), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserReportListAsync(
+            [FromServices] IUserServices user,
+            [FromServices] ListMapper mapper,
+            [FromRoute] Guid userId,
+            [FromQuery] SimpleListRequest request
+            )
+        {
+            var result = await user.GetUserReportListAsync(userId, mapper.ToSimpleList(request));
+            return HandleResult(result);
+        }
     }
 }

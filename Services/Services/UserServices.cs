@@ -265,6 +265,20 @@ namespace Services.Services
             );
         }
 
-        
+        public async Task<Result<PagedResult<UserReportListRespone>>> GetUserReportListAsync(Guid userId, SimpleListCommand command)
+            => await _context.UserReports
+                .AsNoTracking()
+                .ApplySorting(command.SortBy, command.SortDescending)
+                .Where(r => r.ReportedUserId == userId)
+                .Select(r => new UserReportListRespone
+                {
+                    Id = r.Id,
+                    Reason = r.Reason,
+                    Status = r.Status,
+                    CreatedAt = r.CreatedAt,
+                    ResolvedAt = r.ResolvedAt
+                })
+            .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "UserReportList", _ct);
+
     }
 }

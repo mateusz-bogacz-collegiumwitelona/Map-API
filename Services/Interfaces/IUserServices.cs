@@ -13,5 +13,6 @@ namespace Services.Interfaces
         Task<Result<PagedResult<UserListResponse>>> GetUserListAsnyc(UserListCommand command);
         Task<Result<UserDetailResponse>> GetUserDetailAsync(Guid userId);
         Task<Result<UserBanDetailResponse>> GetUserBanDetailAsync(Guid userId);
+        Task<Result<PagedResult<UserReportListRespone>>> GetUserReportListAsync(Guid userId, SimpleListCommand command);
     }
 }

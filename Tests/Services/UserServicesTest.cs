@@ -861,5 +861,325 @@ namespace Tests.Services
             await Assert.That(result.Data).IsNull();
         }
         #endregion
+
+        #region GetUserReportListAsync
+        [Test]
+        public async Task GetUserReportListAsync_WhenUserHasNoReports_ShouldReturnEmptyPagedResult()
+        {
+            // Arrange
+            var user = await AddReportTestUserAsync("Anna", "Nowak");
+            var command = new SimpleListCommand { PageNumber = 1, PageSize = 10 };
+
+            // Act
+            var result = await _userServicesMock.GetUserReportListAsync(user.Id, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.Items).IsEmpty();
+            await Assert.That(result.Data.TotalCount).IsEqualTo(0);
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenUserDoesNotExist_ShouldReturnEmptyPagedResult()
+        {
+            // Arrange
+            var nonExistentUserId = Guid.NewGuid();
+            var command = new SimpleListCommand { PageNumber = 1, PageSize = 10 };
+
+            // Act
+            var result = await _userServicesMock.GetUserReportListAsync(nonExistentUserId, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.Items).IsEmpty();
+            await Assert.That(result.Data.TotalCount).IsEqualTo(0);
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenUserHasReports_ShouldReturnOnlyReportsForThatUserAndMapAllFields()
+        {
+            // Arrange
+            var baseDate = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+            var resolvedAt = baseDate.AddDays(2);
+
+            var targetUser = await AddReportTestUserAsync("Anna", "Nowak");
+            var otherUser = await AddReportTestUserAsync("Piotr", "Zielinski");
+            var reporter = await AddReportTestUserAsync("Adam", "Reporter");
+
+            var report = await AddUserReportAsync(
+                reported: targetUser,
+                reporter: reporter,
+                reason: "Spamming links in comments",
+                status: Domain.Enum.ReportStatusEnum.Approved,
+                createdAt: baseDate,
+                resolvedAt: resolvedAt);
+
+            // Zgłoszenie dla innego użytkownika oraz zgłoszenie złożone przez targetUser (nie przeciwko niemu)
+            await AddUserReportAsync(reported: otherUser, reporter: reporter, reason: "Other user report", createdAt: baseDate);
+            await AddUserReportAsync(reported: otherUser, reporter: targetUser, reason: "Report submitted by target user", createdAt: baseDate);
+
+            var command = new SimpleListCommand { PageNumber = 1, PageSize = 10 };
+
+            // Act
+            var result = await _userServicesMock.GetUserReportListAsync(targetUser.Id, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(1);
+
+            var item = result.Data.Items.Single();
+            await Assert.That(item.Id).IsEqualTo(report.Id);
+            await Assert.That(item.Reason).IsEqualTo("Spamming links in comments");
+            await Assert.That(item.Status).IsEqualTo(Domain.Enum.ReportStatusEnum.Approved);
+            await Assert.That(item.CreatedAt).IsEqualTo(baseDate);
+            await Assert.That(item.ResolvedAt).IsEqualTo(resolvedAt);
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenSortByIsNull_ShouldDefaultToCreatedAtDescending()
+        {
+            // Arrange
+            var baseDate = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+            var targetUser = await AddReportTestUserAsync("Anna", "Nowak");
+            var reporter = await AddReportTestUserAsync("Adam", "Reporter");
+
+            var oldest = await AddUserReportAsync(targetUser, reporter, createdAt: baseDate);
+            var middle = await AddUserReportAsync(targetUser, reporter, createdAt: baseDate.AddDays(1));
+            var newest = await AddUserReportAsync(targetUser, reporter, createdAt: baseDate.AddDays(2));
+
+            var command = new SimpleListCommand { SortBy = null, PageNumber = 1, PageSize = 10 };
+
+            // Act
+            var result = await _userServicesMock.GetUserReportListAsync(targetUser.Id, command);
+
+            // Assert
+            var ids = result.Data!.Items.Select(i => i.Id).ToList();
+            await Assert.That(ids.SequenceEqual(new[] { newest.Id, middle.Id, oldest.Id })).IsTrue();
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenSortByCreatedAtAscending_ShouldReturnOldestFirst()
+        {
+            // Arrange
+            var baseDate = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+            var targetUser = await AddReportTestUserAsync("Anna", "Nowak");
+            var reporter = await AddReportTestUserAsync("Adam", "Reporter");
+
+            var newest = await AddUserReportAsync(targetUser, reporter, createdAt: baseDate.AddDays(2));
+            var oldest = await AddUserReportAsync(targetUser, reporter, createdAt: baseDate);
+            var middle = await AddUserReportAsync(targetUser, reporter, createdAt: baseDate.AddDays(1));
+
+            var command = new SimpleListCommand
+            {
+                SortBy = "createdAt",
+                SortDescending = false,
+                PageNumber = 1,
+                PageSize = 10
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserReportListAsync(targetUser.Id, command);
+
+            // Assert
+            var ids = result.Data!.Items.Select(i => i.Id).ToList();
+            await Assert.That(ids.SequenceEqual(new[] { oldest.Id, middle.Id, newest.Id })).IsTrue();
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenSortByStatus_ShouldSortByStatusInRequestedDirection()
+        {
+            // Arrange
+            var baseDate = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+            var targetUser = await AddReportTestUserAsync("Anna", "Nowak");
+            var reporter = await AddReportTestUserAsync("Adam", "Reporter");
+
+            await AddUserReportAsync(
+                targetUser, reporter, status: Domain.Enum.ReportStatusEnum.Rejected,
+                createdAt: baseDate.AddDays(1), resolvedAt: baseDate.AddDays(2));
+            await AddUserReportAsync(
+                targetUser, reporter, status: Domain.Enum.ReportStatusEnum.Pending,
+                createdAt: baseDate.AddDays(3));
+            await AddUserReportAsync(
+                targetUser, reporter, status: Domain.Enum.ReportStatusEnum.Approved,
+                createdAt: baseDate.AddDays(2), resolvedAt: baseDate.AddDays(3));
+
+            var expectedAscending = await _contextMock.UserReports
+                .AsNoTracking()
+                .Where(r => r.ReportedUserId == targetUser.Id)
+                .OrderBy(r => r.Status)
+                .ThenBy(r => r.Id)
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            var expectedDescending = await _contextMock.UserReports
+                .AsNoTracking()
+                .Where(r => r.ReportedUserId == targetUser.Id)
+                .OrderByDescending(r => r.Status)
+                .ThenBy(r => r.Id)
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            var ascCommand = new SimpleListCommand
+            {
+                SortBy = "status",
+                SortDescending = false,
+                PageNumber = 1,
+                PageSize = 10
+            };
+            var descCommand = new SimpleListCommand
+            {
+                SortBy = "status",
+                SortDescending = true,
+                PageNumber = 1,
+                PageSize = 10
+            };
+
+            // Act
+            var ascending = await _userServicesMock.GetUserReportListAsync(targetUser.Id, ascCommand);
+            var descending = await _userServicesMock.GetUserReportListAsync(targetUser.Id, descCommand);
+
+            // Assert
+            await Assert.That(ascending.Data!.Items.Select(i => i.Id)
+                .SequenceEqual(expectedAscending)).IsTrue();
+            await Assert.That(descending.Data!.Items.Select(i => i.Id)
+                .SequenceEqual(expectedDescending)).IsTrue();
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenSortByResolvedAt_ShouldSortByResolvedAtInRequestedDirection()
+        {
+            // Arrange
+            var baseDate = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+            var targetUser = await AddReportTestUserAsync("Anna", "Nowak");
+            var reporter = await AddReportTestUserAsync("Adam", "Reporter");
+
+            var resolvedFirst = await AddUserReportAsync(
+                targetUser, reporter, status: Domain.Enum.ReportStatusEnum.Approved,
+                createdAt: baseDate, resolvedAt: baseDate.AddDays(1));
+            var resolvedSecond = await AddUserReportAsync(
+                targetUser, reporter, status: Domain.Enum.ReportStatusEnum.Rejected,
+                createdAt: baseDate.AddDays(1), resolvedAt: baseDate.AddDays(5));
+
+            var ascCommand = new SimpleListCommand
+            {
+                SortBy = "resolvedAt",
+                SortDescending = false,
+                PageNumber = 1,
+                PageSize = 10
+            };
+            var descCommand = new SimpleListCommand
+            {
+                SortBy = "resolvedAt",
+                SortDescending = true,
+                PageNumber = 1,
+                PageSize = 10
+            };
+
+            // Act
+            var ascending = await _userServicesMock.GetUserReportListAsync(targetUser.Id, ascCommand);
+            var descending = await _userServicesMock.GetUserReportListAsync(targetUser.Id, descCommand);
+
+            // Assert
+            await Assert.That(ascending.Data!.Items.Select(i => i.Id)
+                .SequenceEqual(new[] { resolvedFirst.Id, resolvedSecond.Id })).IsTrue();
+            await Assert.That(descending.Data!.Items.Select(i => i.Id)
+                .SequenceEqual(new[] { resolvedSecond.Id, resolvedFirst.Id })).IsTrue();
+        }
+
+        [Test]
+        public async Task GetUserReportListAsync_WhenPaginationApplied_ShouldReturnRequestedPageOnly()
+        {
+            // Arrange
+            var baseDate = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+            var targetUser = await AddReportTestUserAsync("Anna", "Nowak");
+            var reporter = await AddReportTestUserAsync("Adam", "Reporter");
+
+            for (var i = 0; i < 5; i++)
+            {
+                await AddUserReportAsync(
+                    targetUser,
+                    reporter,
+                    reason: $"Report {i}",
+                    createdAt: baseDate.AddDays(i));
+            }
+
+            var command = new SimpleListCommand
+            {
+                SortBy = "createdAt",
+                SortDescending = false,
+                PageNumber = 2,
+                PageSize = 2
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserReportListAsync(targetUser.Id, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(5);
+            await Assert.That(result.Data.TotalPages).IsEqualTo(3);
+            await Assert.That(result.Data.PageNumber).IsEqualTo(2);
+            await Assert.That(result.Data.Items.Count).IsEqualTo(2);
+            await Assert.That(result.Data.Items[0].Reason).IsEqualTo("Report 2");
+            await Assert.That(result.Data.Items[1].Reason).IsEqualTo("Report 3");
+        }
+
+        private async Task<User> AddReportTestUserAsync(string firstName, string lastName)
+        {
+            var id = Guid.NewGuid();
+            var user = new User
+            {
+                Id = id,
+                UserName = $"user_{id:N}",
+                NormalizedUserName = $"USER_{id:N}",
+                Email = $"user_{id:N}@example.com",
+                NormalizedEmail = $"USER_{id:N}@EXAMPLE.COM",
+                SecurityStamp = Guid.NewGuid().ToString(),
+                FirstName = firstName,
+                LastName = lastName
+            };
+
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.SaveChangesAsync();
+            return user;
+        }
+
+        private async Task<UserReport> AddUserReportAsync(
+            User reported,
+            User reporter,
+            string reason = "Spam content",
+            Domain.Enum.ReportStatusEnum status = Domain.Enum.ReportStatusEnum.Pending,
+            DateTime? createdAt = null,
+            DateTime? resolvedAt = null)
+        {
+            var report = new UserReport
+            {
+                Id = Guid.NewGuid(),
+                ReportedUserId = reported.Id,
+                ReporterUserId = reporter.Id,
+                Reason = reason,
+                Status = status,
+                ResolvedAt = resolvedAt
+            };
+
+            await _contextMock.UserReports.AddAsync(report);
+            await _contextMock.SaveChangesAsync();
+
+            if (createdAt.HasValue)
+            {
+                await _contextMock.UserReports
+                    .Where(r => r.Id == report.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.CreatedAt, createdAt.Value));
+
+                await _contextMock.Entry(report).ReloadAsync();
+            }
+
+            return report;
+        }
+        #endregion
     }
 }

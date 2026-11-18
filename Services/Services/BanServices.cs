@@ -106,8 +106,8 @@ namespace Services.Services
                 {
                     Id = ur.Id,
                     ReportedUserId = ur.ReportedUserId,
-                    FirstName = ur.ReportedUser.FirstName,
-                    LastName = ur.ReportedUser.LastName,
+                    ReportedFirstName = ur.ReportedUser.FirstName,
+                    ReportedLastName = ur.ReportedUser.LastName,
                     Reason = ur.Reason.Length > 50 ? ur.Reason.Substring(0, 50) + "..." : ur.Reason,
                     Status = ur.Status,
                     CreatedAt = ur.CreatedAt,
