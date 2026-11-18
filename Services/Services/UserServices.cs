@@ -225,12 +225,41 @@ namespace Services.Services
                 LastName = user.LastName,
                 Email = user.Email,
                 Role = user.Role,
-                IsPublic = user.IsPublic,
-                IsBanned = user.IsBanned
+                IsPublic = user.IsPublic
             };
 
             return Result<UserDetailResponse>.Success(
                 message: "User details retrieved successfully.",
+                data: response,
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
+        public async Task<Result<UserBanDetailResponse>> GetUserBanDetailAsync(Guid userId) 
+        {
+            var response = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new UserBanDetailResponse
+                {
+                    IsBanned = u.IsBanned,
+                    BannedUntil = u.BannedUntil,
+                    BannedReason = u.BannedReason
+                })
+                .FirstOrDefaultAsync(_ct);
+
+            if (response == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result<UserBanDetailResponse>.Failure(
+                    message: $"User with ID '{userId}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.NotFound
+                );
+            }
+
+            return Result<UserBanDetailResponse>.Success(
+                message: "User ban details retrieved successfully.",
                 data: response,
                 statusCode: StatusCodes.Status200OK
             );

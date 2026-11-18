@@ -8,6 +8,5 @@
         public required string Email { get; init; }
         public required string Role { get; init; }
         public bool IsPublic { get; init; }
-        public bool IsBanned { get; init; }
     }
 }

@@ -132,5 +132,20 @@ namespace Api.Controllers
             var result = await user.GetUserDetailAsync(userId);
             return HandleResult(result);
         }
+
+        [EndpointSummary("Get user ban detail")]
+        [EndpointDescription("Returns detailed information about a specific user's ban status, " +
+            "including whether the user is currently banned, the reason for the ban, and the duration of the ban. " +
+            "Available only for accounts with the Admin role.")]
+        [HttpGet("detail/{userId:guid}/ban")]
+        [ProducesResponseType(typeof(Result<UserBanDetailResponse>), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserBanDetailAsync(
+           [FromServices] IUserServices user,
+           [FromRoute] Guid userId)
+        {
+            var result = await user.GetUserBanDetailAsync(userId);
+            return HandleResult(result);
+        }
     }
 }

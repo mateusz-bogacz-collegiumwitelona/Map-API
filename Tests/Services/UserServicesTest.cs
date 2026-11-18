@@ -704,7 +704,6 @@ namespace Tests.Services
             await Assert.That(result.Data.Email).IsEqualTo("jan.kowalski@test.pl");
             await Assert.That(result.Data.Role).IsEqualTo("Moderator");
             await Assert.That(result.Data.IsPublic).IsTrue();
-            await Assert.That(result.Data.IsBanned).IsFalse();
         }
 
         [Test]
@@ -734,7 +733,6 @@ namespace Tests.Services
             await Assert.That(result.Data).IsNotNull();
             await Assert.That(result.Data!.Role).IsEqualTo(string.Empty);
             await Assert.That(result.Data.IsPublic).IsFalse();
-            await Assert.That(result.Data.IsBanned).IsTrue();
         }
 
         [Test]
@@ -777,6 +775,90 @@ namespace Tests.Services
             await Assert.That(async () => await _userServicesMock.GetUserDetailAsync(userId))
                 .Throws<InternalServerException>()
                 .WithMessage("User email is required.");
+        }
+        #endregion
+
+        #region GetUserBanDetailAsync
+        [Test]
+        public async Task GetUserBanDetailAsync_WhenUserIsBanned_ShouldReturnBanDetails()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var bannedUntil = new DateTime(2027, 1, 15, 12, 0, 0, DateTimeKind.Utc);
+            var bannedReason = "Violation of community guidelines.";
+
+            var user = new User
+            {
+                Id = userId,
+                FirstName = "Jan",
+                LastName = "Kowalski",
+                IsBanned = true,
+                BannedUntil = bannedUntil,
+                BannedReason = bannedReason
+            };
+
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.GetUserBanDetailAsync(userId);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("User ban details retrieved successfully.");
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.IsBanned).IsTrue();
+            await Assert.That(result.Data.BannedUntil).IsEqualTo(bannedUntil);
+            await Assert.That(result.Data.BannedReason).IsEqualTo(bannedReason);
+        }
+
+        [Test]
+        public async Task GetUserBanDetailAsync_WhenUserIsNotBanned_ShouldReturnDefaultUnbannedDetails()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var user = new User
+            {
+                Id = userId,
+                FirstName = "Anna",
+                LastName = "Nowak",
+                IsBanned = false,
+                BannedUntil = null,
+                BannedReason = null
+            };
+
+            await _contextMock.Users.AddAsync(user);
+            await _contextMock.SaveChangesAsync();
+
+            // Act
+            var result = await _userServicesMock.GetUserBanDetailAsync(userId);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("User ban details retrieved successfully.");
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.IsBanned).IsFalse();
+            await Assert.That(result.Data.BannedUntil).IsNull();
+            await Assert.That(result.Data.BannedReason).IsNull();
+        }
+
+        [Test]
+        public async Task GetUserBanDetailAsync_WhenUserDoesNotExist_ShouldReturnNotFoundFailure()
+        {
+            // Arrange
+            var nonExistentUserId = Guid.NewGuid();
+
+            // Act
+            var result = await _userServicesMock.GetUserBanDetailAsync(nonExistentUserId);
+
+            // Assert
+            await Assert.That(result).IsNotNull();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(Domain.Const.ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo($"User with ID '{nonExistentUserId}' was not found.");
+            await Assert.That(result.Data).IsNull();
         }
         #endregion
     }
