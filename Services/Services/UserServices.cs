@@ -6,8 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
+using Services.Command.List;
 using Services.Command.User;
+using Services.Helpers;
 using Services.Interfaces;
+using Services.QueryExtension;
 using Services.Response.User;
 
 namespace Services.Services
@@ -17,6 +20,7 @@ namespace Services.Services
         private readonly AppDbContext _context;
         private readonly ILogger<UserServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+        private CancellationToken _ct => _ctAccessor.Token;
 
         public UserServices(
             AppDbContext context,
@@ -146,5 +150,32 @@ namespace Services.Services
 
             return user;
         }
+
+        public async Task<Result<PagedResult<UserListResponse>>> GetUserListAsnyc(UserListCommand command)
+            => await _context.Users
+                .AsNoTracking()
+                .ApplySearch(command.SearchTerm, _context)
+                .ApplyFilter(command.IncludeBanned, command.IncludeAdmins, _context)
+                .ApplySorting(command.SortBy, command.SortDescending)
+                .Select(u => new UserListResponse
+                {
+                    Id = u.Id,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+
+                    Role = _context.UserRoles
+                        .Where(ur => ur.UserId == u.Id)
+                        .Join(_context.Roles,
+                            ur => ur.RoleId,
+                            r => r.Id,
+                            (ur, r) => r.Name)
+                        .FirstOrDefault() ?? string.Empty,
+
+                    IsBanned = u.IsBanned,
+                    BannedUntil = u.BannedUntil,
+                    CreatedAt = u.CreatedAt,
+                    UpdatedAt = u.UpdatedAt
+                })
+            .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "UserList", _ct);
     }
 }

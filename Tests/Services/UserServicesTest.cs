@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Services.Accessors.Interfaces;
+using Services.Command.List;
 using Services.Command.User;
 using Services.Interfaces;
 using Services.Services;
@@ -400,6 +401,258 @@ namespace Tests.Services
             await Assert.That(async () => await _userServicesMock.SetProfileVisibilityAsync(nonExistentUserId, isPublic: true))
                 .Throws<NotFoundException>()
                 .WithMessage($"User with ID '{nonExistentUserId}' was not found.");
+        }
+        #endregion
+
+        #region GetUserListAsync
+        [Test]
+        public async Task GetUserListAsync_WhenDefaultFlagsUsed_ShouldExcludeBannedAndAdminUsers()
+        {
+            // Arrange
+            var adminRole = new Microsoft.AspNetCore.Identity.IdentityRole<Guid> { Id = Guid.NewGuid(), Name = "Admin", NormalizedName = "ADMIN" };
+            var userRole = new Microsoft.AspNetCore.Identity.IdentityRole<Guid> { Id = Guid.NewGuid(), Name = "User", NormalizedName = "USER" };
+            await _contextMock.Roles.AddRangeAsync(adminRole, userRole);
+
+            var regularUser = new User { Id = Guid.NewGuid(), FirstName = "Jan", LastName = "Kowalski", Email = "jan@test.pl", IsBanned = false };
+            var adminUser = new User { Id = Guid.NewGuid(), FirstName = "Adam", LastName = "Adminowski", Email = "admin@test.pl", IsBanned = false };
+            var bannedUser = new User { Id = Guid.NewGuid(), FirstName = "Marek", LastName = "Zbanowany", Email = "banned@test.pl", IsBanned = true, BannedUntil = DateTime.UtcNow.AddDays(7) };
+            var noRoleUser = new User { Id = Guid.NewGuid(), FirstName = "Ewa", LastName = "Nowak", Email = "ewa@test.pl", IsBanned = false };
+
+            await _contextMock.Users.AddRangeAsync(regularUser, adminUser, bannedUser, noRoleUser);
+            await _contextMock.UserRoles.AddRangeAsync(
+                new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid> { UserId = regularUser.Id, RoleId = userRole.Id },
+                new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid> { UserId = adminUser.Id, RoleId = adminRole.Id },
+                new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid> { UserId = bannedUser.Id, RoleId = userRole.Id }
+            );
+            await _contextMock.SaveChangesAsync();
+
+            var command = new UserListCommand
+            {
+                PageNumber = 1,
+                PageSize = 10,
+                IncludeBanned = false,
+                IncludeAdmins = false
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserListAsnyc(command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("UserList retrieved successfully.");
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(2);
+            await Assert.That(result.Data.Items.Count).IsEqualTo(2);
+
+            var janDto = result.Data.Items.First(u => u.Id == regularUser.Id);
+            await Assert.That(janDto.Role).IsEqualTo("User");
+            await Assert.That(janDto.IsBanned).IsFalse();
+
+            var ewaDto = result.Data.Items.First(u => u.Id == noRoleUser.Id);
+            await Assert.That(ewaDto.Role).IsEqualTo(string.Empty);
+        }
+
+        [Test]
+        public async Task GetUserListAsync_WhenIncludeBannedIsTrue_ShouldReturnBannedUsers()
+        {
+            // Arrange
+            var bannedUntil = DateTime.UtcNow.AddDays(5);
+            var activeUser = new User { Id = Guid.NewGuid(), FirstName = "Jan", LastName = "Aktywny", IsBanned = false };
+            var bannedUser = new User { Id = Guid.NewGuid(), FirstName = "Piotr", LastName = "Zbanowany", IsBanned = true, BannedUntil = bannedUntil };
+
+            await _contextMock.Users.AddRangeAsync(activeUser, bannedUser);
+            await _contextMock.SaveChangesAsync();
+
+            var command = new UserListCommand
+            {
+                PageNumber = 1,
+                PageSize = 10,
+                IncludeBanned = true,
+                IncludeAdmins = false
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserListAsnyc(command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(2);
+
+            var bannedDto = result.Data.Items.First(u => u.Id == bannedUser.Id);
+            await Assert.That(bannedDto.IsBanned).IsTrue();
+            await Assert.That(bannedDto.BannedUntil).IsNotNull();
+        }
+
+        [Test]
+        public async Task GetUserListAsync_WhenIncludeAdminsIsTrue_ShouldReturnAdminUsers()
+        {
+            // Arrange
+            var adminRole = new Microsoft.AspNetCore.Identity.IdentityRole<Guid> { Id = Guid.NewGuid(), Name = "Admin", NormalizedName = "ADMIN" };
+            await _contextMock.Roles.AddAsync(adminRole);
+
+            var regularUser = new User { Id = Guid.NewGuid(), FirstName = "Jan", LastName = "Kowalski" };
+            var adminUser = new User { Id = Guid.NewGuid(), FirstName = "Anna", LastName = "Administrator" };
+
+            await _contextMock.Users.AddRangeAsync(regularUser, adminUser);
+            await _contextMock.UserRoles.AddAsync(new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid>
+            {
+                UserId = adminUser.Id,
+                RoleId = adminRole.Id
+            });
+            await _contextMock.SaveChangesAsync();
+
+            var command = new UserListCommand
+            {
+                PageNumber = 1,
+                PageSize = 10,
+                IncludeBanned = false,
+                IncludeAdmins = true
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserListAsnyc(command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(2);
+
+            var adminDto = result.Data.Items.First(u => u.Id == adminUser.Id);
+            await Assert.That(adminDto.Role).IsEqualTo("Admin");
+        }
+
+        [Test]
+        public async Task GetUserListAsync_WhenSearchTermHasDiacriticsOrMixedCase_ShouldFilterCaseAndAccentInsensitively()
+        {
+            // Arrange
+            var moderatorRole = new Microsoft.AspNetCore.Identity.IdentityRole<Guid> { Id = Guid.NewGuid(), Name = "Moderator", NormalizedName = "MODERATOR" };
+            await _contextMock.Roles.AddAsync(moderatorRole);
+
+            var user1 = new User { Id = Guid.NewGuid(), FirstName = "Łukasz", LastName = "Żółć", Email = "lukasz@example.com" };
+            var user2 = new User { Id = Guid.NewGuid(), FirstName = "Katarzyna", LastName = "Nowak", Email = "kasia@firma.pl" };
+            var user3 = new User { Id = Guid.NewGuid(), FirstName = "Tomasz", LastName = "Zieliński", Email = "tomek@example.com" };
+
+            await _contextMock.Users.AddRangeAsync(user1, user2, user3);
+            await _contextMock.UserRoles.AddAsync(new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid>
+            {
+                UserId = user3.Id,
+                RoleId = moderatorRole.Id
+            });
+            await _contextMock.SaveChangesAsync();
+
+            // Act 
+            var resultByName = await _userServicesMock.GetUserListAsnyc(new UserListCommand
+            {
+                SearchTerm = "lukasz zolc",
+                PageNumber = 1,
+                PageSize = 10
+            });
+
+            var resultByEmail = await _userServicesMock.GetUserListAsnyc(new UserListCommand
+            {
+                SearchTerm = "FIRMA.PL",
+                PageNumber = 1,
+                PageSize = 10
+            });
+
+            var resultByRole = await _userServicesMock.GetUserListAsnyc(new UserListCommand
+            {
+                SearchTerm = "moder",
+                PageNumber = 1,
+                PageSize = 10
+            });
+
+            // Assert
+            await Assert.That(resultByName.Data!.TotalCount).IsEqualTo(1);
+            await Assert.That(resultByName.Data.Items[0].Id).IsEqualTo(user1.Id);
+
+            await Assert.That(resultByEmail.Data!.TotalCount).IsEqualTo(1);
+            await Assert.That(resultByEmail.Data.Items[0].Id).IsEqualTo(user2.Id);
+
+            await Assert.That(resultByRole.Data!.TotalCount).IsEqualTo(1);
+            await Assert.That(resultByRole.Data.Items[0].Id).IsEqualTo(user3.Id);
+        }
+
+        [Test]
+        public async Task GetUserListAsync_WhenSortingAndPaginationApplied_ShouldReturnCorrectPageAndOrder()
+        {
+            // Arrange
+            var userA = new User { Id = Guid.NewGuid(), FirstName = "Adam", LastName = "A", CreatedAt = DateTime.UtcNow.AddDays(-3) };
+            var userB = new User { Id = Guid.NewGuid(), FirstName = "Bartosz", LastName = "B", CreatedAt = DateTime.UtcNow.AddDays(-2) };
+            var userC = new User { Id = Guid.NewGuid(), FirstName = "Cezary", LastName = "C", CreatedAt = DateTime.UtcNow.AddDays(-1) };
+
+            await _contextMock.Users.AddRangeAsync(userA, userB, userC);
+            await _contextMock.SaveChangesAsync();
+
+            var command = new UserListCommand
+            {
+                PageNumber = 2,
+                PageSize = 2,
+                SortBy = "FirstName",
+                SortDescending = true
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserListAsnyc(command);
+
+            // Assert 
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(3);
+            await Assert.That(result.Data.TotalPages).IsEqualTo(2);
+            await Assert.That(result.Data.PageNumber).IsEqualTo(2);
+            await Assert.That(result.Data.Items.Count).IsEqualTo(1);
+            await Assert.That(result.Data.Items[0].FirstName).IsEqualTo("Adam");
+        }
+
+        [Test]
+        public async Task GetUserListAsync_WhenNoUsersMatchCriteria_ShouldReturnEmptyPagedResult()
+        {
+            // Arrange
+            await _contextMock.Users.AddAsync(new User { Id = Guid.NewGuid(), FirstName = "Jan", LastName = "Kowalski" });
+            await _contextMock.SaveChangesAsync();
+
+            var command = new UserListCommand
+            {
+                SearchTerm = "NieistniejacyUzytkownik123",
+                PageNumber = 1,
+                PageSize = 10
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserListAsnyc(command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Message).IsEqualTo("No UserList found.");
+            await Assert.That(result.Data).IsNotNull();
+            await Assert.That(result.Data!.Items.Count).IsEqualTo(0);
+            await Assert.That(result.Data.TotalCount).IsEqualTo(0);
+            await Assert.That(result.Data.TotalPages).IsEqualTo(0);
+        }
+
+        [Test]
+        public async Task GetUserListAsync_WhenPageNumberExceedsTotalPages_ShouldClampToLastPage()
+        {
+            // Arrange
+            await _contextMock.Users.AddRangeAsync(
+                new User { Id = Guid.NewGuid(), FirstName = "User1", LastName = "Test" },
+                new User { Id = Guid.NewGuid(), FirstName = "User2", LastName = "Test" }
+            );
+            await _contextMock.SaveChangesAsync();
+
+            var command = new UserListCommand
+            {
+                PageNumber = 99,
+                PageSize = 2
+            };
+
+            // Act
+            var result = await _userServicesMock.GetUserListAsnyc(command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.PageNumber).IsEqualTo(1);
+            await Assert.That(result.Data.TotalPages).IsEqualTo(1);
+            await Assert.That(result.Data.Items.Count).IsEqualTo(2);
         }
         #endregion
     }

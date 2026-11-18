@@ -2,6 +2,7 @@
 using Api.Controllers.Base;
 using Api.Mappers;
 using Api.Request.Account;
+using Api.Request.List;
 using Api.Request.User;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -97,6 +98,23 @@ namespace Api.Controllers
             [FromServices] IAccountServices account)
         {
             var result = await account.DeleteAccountAsync(CurrentUserId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Retrieve a paginated list of users")]
+        [EndpointDescription("Returns a paginated list of users with optional accent-insensitive search by first name," +
+            " last name, email, or role. By default, banned users and administrators are excluded unless explicitly " +
+            "included via query flags. Available only for accounts with the Admin role.")]
+        [ProducesResponseType(typeof(Result<PagedResult<UserListResponse>>), StatusCodes.Status200OK)]
+        [HttpDelete]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserListAsnyc(
+            [FromServices] IUserServices user,
+            [FromServices] ListMapper mapper,
+            [FromQuery] UserListRequest request
+            )
+        {
+            var result = await user.GetUserListAsnyc(mapper.MapUserList(request));
             return HandleResult(result);
         }
     }
