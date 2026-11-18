@@ -13,5 +13,8 @@ namespace Api.Mappers
 
         [MapProperty(nameof(UserListRequest.SearchTerm), nameof(UserListCommand.SearchTerm), Use = nameof(Trim))]
         public partial UserListCommand MapUserList(UserListRequest request);
+
+        [MapProperty(nameof(ReportListRequest.SearchTerm), nameof(ReportListCommand.SearchTerm), Use = nameof(Trim))]
+        public partial ReportListCommand ToReportList(ReportListRequest request);
     }
 }

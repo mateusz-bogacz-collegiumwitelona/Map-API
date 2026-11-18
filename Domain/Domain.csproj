@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.12" />
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
+    <PackageReference Include="Stateless" Version="5.20.1" />
   </ItemGroup>
 
 </Project>

@@ -32,14 +32,37 @@ namespace Email
             return options.Port == ImplicitTlsPort ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
         }
 
-        public Task SendEmailChangeCodeAsync(string toEmail, string firstName, string code, int validForMinutes, CancellationToken cancellationToken = default)
+        public Task SendEmailChangeCodeAsync(
+            string toEmail,
+            string firstName,
+            string code,
+            int validForMinutes,
+            CancellationToken cancellationToken = default)
             => SendAsync(toEmail, EmailTemplates.EmailChangeCode(firstName, code, validForMinutes), cancellationToken);
 
-        public Task SendEmailChangedNotificationAsync(string toEmail, string firstName, string newEmail, CancellationToken cancellationToken = default)
+        public Task SendEmailChangedNotificationAsync(
+            string toEmail,
+            string firstName,
+            string newEmail,
+            CancellationToken cancellationToken = default)
             => SendAsync(toEmail, EmailTemplates.EmailChangedNotification(firstName, newEmail), cancellationToken);
 
-        public Task SendRegistrationVerificationCodeAsync(string toEmail, string firstName, string code, int validForMinutes, CancellationToken cancellationToken = default)
+        public Task SendRegistrationVerificationCodeAsync(
+            string toEmail,
+            string firstName,
+            string code,
+            int validForMinutes,
+            CancellationToken cancellationToken = default
+            )
             => SendAsync(toEmail, EmailTemplates.RegistrationVerificationCode(firstName, code, validForMinutes), cancellationToken);
+
+        public Task SendAccountBannedNotificationAsync(
+            string toEmail,
+            string firstName,
+            string reason,
+            DateTime? bannedUntil,
+            CancellationToken cancellationToken = default)
+           => SendAsync(toEmail, EmailTemplates.AccountBannedNotification(firstName, reason, bannedUntil), cancellationToken);
 
         private async Task SendAsync(string toEmail, EmailContent content, CancellationToken cancellationToken)
         {

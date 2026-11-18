@@ -4,7 +4,6 @@ using Api.Request.Auth;
 using Riok.Mapperly.Abstractions;
 using Services.Command.Account;
 using Services.Command.Auth;
-using Services.Commands.Auth;
 
 namespace Api.Mappers
 {

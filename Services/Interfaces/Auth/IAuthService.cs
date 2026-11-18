@@ -1,5 +1,5 @@
 using Domain.Common;
-using Services.Commands.Auth;
+using Services.Command.Auth;
 using Services.Response.Auth;
 
 namespace Services.Interfaces.Auth

@@ -9,6 +9,7 @@ namespace Api.Configuration
     {
         public const string AuthPolicy = "Auth";
         public const string EmailResendPolicy = "EmailResend";
+        public const string ReportPolicy = "Report";
 
         public static IServiceCollection AddRateLimitingConfiguration(this IServiceCollection services)
         {
@@ -36,6 +37,19 @@ namespace Api.Configuration
                         {
                             PermitLimit = 1,
                             Window = TimeSpan.FromSeconds(VerificationConst.ResendCooldownSeconds),
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        }));
+
+                options.AddPolicy(ReportPolicy, httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                            ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 3,
+                            Window = TimeSpan.FromMinutes(10),
                             QueueLimit = 0,
                             AutoReplenishment = true
                         }));

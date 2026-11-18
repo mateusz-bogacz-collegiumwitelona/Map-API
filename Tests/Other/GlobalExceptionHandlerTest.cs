@@ -43,7 +43,7 @@ namespace Tests.Other
             });
         }
 
-        // ─── TryHandleAsync ────────────────────────────────
+        #region TryHandleAsync 
 
         [Test]
         public async Task TryHandleAsync_WhenOperationCanceledException_ReturnsTrueAndDoesNotWriteToResponse()
@@ -187,5 +187,6 @@ namespace Tests.Other
 
             await Assert.That(response.Message).DoesNotContain("secret_data");
         }
+        #endregion
     }
 }
