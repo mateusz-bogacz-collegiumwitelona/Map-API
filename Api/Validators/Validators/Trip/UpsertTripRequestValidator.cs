@@ -1,6 +1,7 @@
 ﻿using Api.Request.Trip;
 using Domain.Const;
 using FluentValidation;
+using Domain.Enum;
 
 namespace Api.Validators.Validators.Trip
 {
@@ -38,6 +39,27 @@ namespace Api.Validators.Validators.Trip
 
             RuleForEach(x => x.Segments)
                 .SetValidator(new TripSegmentRequestValidator());
+        }
+
+        private static bool IsValidTransportType(string? transportType)
+        {
+            if (string.IsNullOrWhiteSpace(transportType))
+            {
+                return false;
+            }
+
+            foreach (var validTransportType in System.Enum.GetNames<TransportTypeEnum>())
+            {
+                if (string.Equals(
+                        validTransportType,
+                        transportType,
+                        System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool HaveContinuousSegments(
@@ -90,7 +112,7 @@ namespace Api.Validators.Validators.Trip
                     .SetValidator(new TripPointRequestValidator());
 
                 RuleFor(x => x.TransportType)
-                    .IsInEnum()
+                    .Must(IsValidTransportType)
                     .WithErrorCode(ErrorCodes.TripTransportTypeInvalid);
             }
         }

@@ -1,7 +1,6 @@
 ﻿using Api.Request.Trip;
 using Api.Validators.Validators.Trip;
 using Domain.Const;
-using Domain.Enum;
 using FluentValidation.TestHelper;
 
 namespace Tests.Validators.Trip
@@ -106,7 +105,7 @@ namespace Tests.Validators.Trip
                     Longitude = 21.0122
                 },
                 Destination = request.Segments[0].Origin,
-                TransportType = TransportTypeEnum.Train
+                TransportType = "Train"
             };
 
             request = request with
@@ -166,7 +165,7 @@ namespace Tests.Validators.Trip
             var request = CreateValidRequest();
             var segment = request.Segments[0] with
             {
-                TransportType = (TransportTypeEnum)999
+                TransportType = "Helicopter"
             };
 
             request = request with
@@ -211,7 +210,7 @@ namespace Tests.Validators.Trip
                             Latitude = 41.9028,
                             Longitude = 12.4964
                         },
-                        TransportType = TransportTypeEnum.Train
+                        TransportType = "Train"
                     }
                 }
             };

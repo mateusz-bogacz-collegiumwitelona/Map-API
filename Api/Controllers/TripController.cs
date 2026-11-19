@@ -5,7 +5,6 @@ using Api.Request.Trip;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Services.Command.Trip;
 using Services.Interfaces;
 using Services.Response.Trip;
 
@@ -85,12 +84,13 @@ namespace Api.Controllers
         [HttpPost("create")]
         [Authorize]
         public async Task<IActionResult> CreateTripAsync(
-            [FromBody] UpsertTripRequest request,
-            [FromServices] ITripServices trips)
+        [FromBody] UpsertTripRequest request,
+        [FromServices] ITripServices trips,
+        [FromServices] TripMapper mapper)
         {
             var result = await trips.CreateTripAsync(
                 CurrentUserId,
-                ToCommand(request));
+                mapper.MapUpsertTrip(request));
 
             return HandleResult(result);
         }
@@ -101,14 +101,15 @@ namespace Api.Controllers
         [HttpPut("update/{tripId:guid}")]
         [Authorize]
         public async Task<IActionResult> UpdateTripAsync(
-            [FromRoute] Guid tripId,
-            [FromBody] UpsertTripRequest request,
-            [FromServices] ITripServices trips)
+        [FromRoute] Guid tripId,
+        [FromBody] UpsertTripRequest request,
+        [FromServices] ITripServices trips,
+        [FromServices] TripMapper mapper)
         {
             var result = await trips.UpdateTripAsync(
                 CurrentUserId,
                 tripId,
-                ToCommand(request));
+                mapper.MapUpsertTrip(request));
 
             return HandleResult(result);
         }
@@ -124,29 +125,6 @@ namespace Api.Controllers
         {
             var result = await trips.DeleteTripAsync(CurrentUserId, tripId);
             return HandleResult(result);
-        }
-
-        private static UpsertTripCommand ToCommand(UpsertTripRequest request)
-        {
-            var segments = request.Segments
-                .Select(segment => new TripSegmentCommand(
-                    new TripPointCommand(
-                        segment.Origin.Name,
-                        segment.Origin.Latitude,
-                        segment.Origin.Longitude),
-                    new TripPointCommand(
-                        segment.Destination.Name,
-                        segment.Destination.Latitude,
-                        segment.Destination.Longitude),
-                    segment.TransportType))
-                .ToList();
-
-            return new UpsertTripCommand(
-                request.Title,
-                request.Description,
-                request.StartDate,
-                request.EndDate,
-                segments);
         }
     }
 }

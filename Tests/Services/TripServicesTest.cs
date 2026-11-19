@@ -1161,7 +1161,12 @@ namespace Tests.Services
             double latitude,
             double longitude)
         {
-            return new TripPointCommand(name, latitude, longitude);
+            return new TripPointCommand
+            {
+                Name = name,
+                Latitude = latitude,
+                Longitude = longitude
+            };
         }
 
         private static TripSegmentCommand CreateTripSegment(
@@ -1169,7 +1174,29 @@ namespace Tests.Services
             TripPointCommand destination,
             TransportTypeEnum transportType = TransportTypeEnum.Car)
         {
-            return new TripSegmentCommand(origin, destination, transportType);
+            return new TripSegmentCommand
+            {
+                Origin = origin,
+                Destination = destination,
+                TransportType = transportType
+            };
+        }
+
+        private static UpsertTripCommand CreateUpsertTripCommand(
+        string title,
+        string? description,
+        DateTime startDate,
+        DateTime? endDate,
+        IReadOnlyList<TripSegmentCommand> segments)
+        {
+            return new UpsertTripCommand
+            {
+                Title = title,
+                Description = description,
+                StartDate = startDate,
+                EndDate = endDate,
+                Segments = segments
+            };
         }
 
         [Test]
@@ -1179,7 +1206,7 @@ namespace Tests.Services
             await SetDistinctCountryBoundariesAsync();
 
             var user = await AddUserAsync();
-            var command = new UpsertTripCommand(
+            var command = CreateUpsertTripCommand(
                 "Podróż",
                 "Opis",
                 Utc(2025, 6, 1),
@@ -1239,7 +1266,7 @@ namespace Tests.Services
 
             var trip = await service.CreateTripAsync(
                 user.Id,
-                new UpsertTripCommand(
+                CreateUpsertTripCommand(
                     "Podróż",
                     "Opis",
                     Utc(2025, 6, 1),
@@ -1281,7 +1308,7 @@ namespace Tests.Services
 
             var created = await service.CreateTripAsync(
                 user.Id,
-                new UpsertTripCommand(
+                CreateUpsertTripCommand(
                     "Stara nazwa",
                     null,
                     Utc(2025, 6, 1),
@@ -1293,7 +1320,7 @@ namespace Tests.Services
                             CreateTripPoint("Rzym", 41.9028, 12.4964))
                     }));
 
-            var command = new UpsertTripCommand(
+            var command = CreateUpsertTripCommand(
                 "Nowa nazwa",
                 "Zaktualizowany opis",
                 Utc(2026, 7, 1),
@@ -1346,7 +1373,7 @@ namespace Tests.Services
 
             var tripToDelete = await service.CreateTripAsync(
                 user.Id,
-                new UpsertTripCommand(
+                CreateUpsertTripCommand(
                     "Do usunięcia",
                     null,
                     Utc(2025, 6, 1),
@@ -1360,7 +1387,7 @@ namespace Tests.Services
 
             var remainingTrip = await service.CreateTripAsync(
                 user.Id,
-                new UpsertTripCommand(
+                CreateUpsertTripCommand(
                     "Pozostaje",
                     null,
                     Utc(2025, 8, 1),
@@ -1423,7 +1450,7 @@ namespace Tests.Services
 
             var trip = await service.CreateTripAsync(
                 owner.Id,
-                new UpsertTripCommand(
+                CreateUpsertTripCommand(
                     "Prywatna podróż",
                     null,
                     Utc(2025, 6, 1),
@@ -1437,7 +1464,7 @@ namespace Tests.Services
 
             var tripId = trip.Data!.Id;
 
-            var updateCommand = new UpsertTripCommand(
+            var updateCommand = CreateUpsertTripCommand(
                 "Zmiana",
                 null,
                 Utc(2025, 6, 1),
@@ -1497,7 +1524,7 @@ namespace Tests.Services
             var user = await AddUserAsync();
             var service = CreateManagementService();
 
-            var command = new UpsertTripCommand(
+            var command = CreateUpsertTripCommand(
                 "Niepoprawny punkt",
                 null,
                 Utc(2025, 6, 1),
@@ -1555,7 +1582,7 @@ namespace Tests.Services
 
             var trip = await service.CreateTripAsync(
                 user.Id,
-                new UpsertTripCommand(
+                CreateUpsertTripCommand(
                     "Nazwa przed zmianą",
                     null,
                     Utc(2025, 6, 1),
@@ -1569,7 +1596,7 @@ namespace Tests.Services
 
             var tripId = trip.Data!.Id;
 
-            var updateCommand = new UpsertTripCommand(
+            var updateCommand = CreateUpsertTripCommand(
                 "Nazwa po zmianie",
                 null,
                 Utc(2026, 6, 1),
