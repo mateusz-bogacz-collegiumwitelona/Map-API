@@ -1,5 +1,4 @@
 using Domain.Enum;
-using System.Text.Json.Serialization;
 
 namespace Services.Response.Trip
 {

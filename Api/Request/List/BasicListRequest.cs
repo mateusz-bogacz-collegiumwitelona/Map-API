@@ -1,6 +1,6 @@
 ﻿namespace Api.Request.List
 {
-    public sealed record BasicListRequest
+    public record BasicListRequest
     {
         public int? PageNumber { get; init; }
         public int? PageSize { get; init; }
