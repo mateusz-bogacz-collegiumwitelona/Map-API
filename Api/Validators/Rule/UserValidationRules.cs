@@ -16,6 +16,12 @@ namespace Api.Validators.Rule
                 .Must((string? val) => val == null || val.Trim().Length <= 500)
                 .WithErrorCode(ErrorCodes.BioInvalid);
 
+        public static IRuleBuilderOptions<T, string?> ApplyUserSortRules<T>(this IRuleBuilder<T, string?> ruleBuilder)
+            => ruleBuilder
+                .Must((string? val) => string.IsNullOrWhiteSpace(val)
+                    || UserSearchConst.SortOptions.Contains(val.Trim(), StringComparer.OrdinalIgnoreCase))
+                .WithErrorCode(ErrorCodes.SortInvalid);
+
         public static IRuleBuilderOptions<T, string> ApplyStrongPasswordRules<T>(this IRuleBuilder<T, string> ruleBuilder)
             => ruleBuilder
                 .NotEmpty().WithErrorCode(ErrorCodes.ValidationError)

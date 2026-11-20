@@ -37,6 +37,7 @@
         public const string EmailTaken = "USR_005";
         public const string EmailUnchanged = "USR_006";
         public const string EmailAlreadyExist = "USR_007";
+        public const string SortInvalid = "USR_008";
         #endregion
 
         #region Verification

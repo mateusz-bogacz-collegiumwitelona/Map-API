@@ -29,6 +29,7 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.LastNameInvalid).IsEqualTo("USR_002");
             await Assert.That(ErrorCodes.BioInvalid).IsEqualTo("USR_003");
             await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
+            await Assert.That(ErrorCodes.SortInvalid).IsEqualTo("USR_008");
         }
 
         [Test]
@@ -54,7 +55,8 @@ namespace Tests.Other
                 ErrorCodes.FirstNameInvalid,
                 ErrorCodes.LastNameInvalid,
                 ErrorCodes.BioInvalid,
-                ErrorCodes.YearInvalid
+                ErrorCodes.YearInvalid,
+                ErrorCodes.SortInvalid
             };
 
             await Assert.That(codes.Distinct().Count()).IsEqualTo(codes.Length);
