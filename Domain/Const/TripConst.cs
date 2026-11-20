@@ -12,5 +12,6 @@ namespace Domain.Const
         public const double RouteEndpointToleranceKm = 10.0;
         public const double RouteDistanceTolerance = 0.01;
         public const double RouteDistanceRoundingKm = 0.005;
+        public const double MaxRouteDistanceRatio = 1.5;
     }
 }

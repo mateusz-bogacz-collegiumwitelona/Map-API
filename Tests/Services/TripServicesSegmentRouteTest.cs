@@ -17,14 +17,14 @@ using Tests.Fakes;
 
 namespace Tests.Services
 {
-    public class TripSegmentServicesTest
+    public class TripServicesSegmentRouteTest
     {
         #region Configuration and Setup
         private AppDbContext _context = null!;
         private static PostgreSqlContainer _dbContainer = null!;
         private static string _connectionString = null!;
 
-        private ITripSegmentServices _sut = null!;
+        private ITripServices _sut = null!;
         private string _currentSchema = null!;
         private Country _poland = null!;
         private Country _italy = null!;
@@ -109,9 +109,9 @@ namespace Tests.Services
             _context.Places.AddRange(_krakow, _rome, _suva, _apia);
             await _context.SaveChangesAsync();
 
-            _sut = new TripSegmentServices(
+            _sut = new TripServices(
                 _context,
-                new LoggerFactory().CreateLogger<TripSegmentServices>(),
+                new LoggerFactory().CreateLogger<TripServices>(),
                 new FakeCancellationTokenAccessor());
         }
 
@@ -242,7 +242,7 @@ namespace Tests.Services
 
         #region Storing routes
         [Test]
-        public async Task UpdateRouteAsync_ShouldStoreRouteDistanceAndFallbackFlag()
+        public async Task UpdateSegmentRouteAsync_ShouldStoreRouteDistanceAndFallbackFlag()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -250,7 +250,7 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome(1250.75m, isFallbackRoute: false));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(1250.75m, isFallbackRoute: false));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -269,7 +269,7 @@ namespace Tests.Services
         [Arguments(TransportTypeEnum.Plane)]
         [Arguments(TransportTypeEnum.Train)]
         [Arguments(TransportTypeEnum.Other)]
-        public async Task UpdateRouteAsync_ShouldStoreRouteForEveryTransportType(TransportTypeEnum transportType)
+        public async Task UpdateSegmentRouteAsync_ShouldStoreRouteForEveryTransportType(TransportTypeEnum transportType)
         {
             // Arrange
             var user = await AddUserAsync();
@@ -277,7 +277,7 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip, transportType);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome(isFallbackRoute: true));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(1073.42m, isFallbackRoute: true));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -289,43 +289,38 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_ShouldReplaceThePreviousRoute()
+        public async Task UpdateSegmentRouteAsync_ShouldReplaceThePreviousRoute()
         {
             // Arrange
             var user = await AddUserAsync();
             var trip = await AddTripAsync(user);
             var segment = await AddSegmentAsync(trip);
-            await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome(1250.75m));
+            await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(1250.75m));
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(1100.00m, true, (50.06, 19.94), (41.90, 12.49)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1073.35m, true, (50.06, 19.94), (41.90, 12.49)));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
 
             var stored = await ReloadSegmentAsync(segment.Id);
             await Assert.That(stored.Geometry.NumPoints).IsEqualTo(2);
-            await Assert.That(stored.DistanceKm).IsEqualTo(1100.00m);
+            await Assert.That(stored.DistanceKm).IsEqualTo(1073.35m);
             await Assert.That(stored.IsFallbackRoute).IsTrue();
         }
 
         [Test]
-        public async Task UpdateRouteAsync_ShouldBeReturnedByTripRoutes()
+        public async Task UpdateSegmentRouteAsync_ShouldBeReturnedByTripRoutes()
         {
             // Arrange
             var user = await AddUserAsync();
             var trip = await AddTripAsync(user);
             var segment = await AddSegmentAsync(trip, TransportTypeEnum.Train);
-            await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome(1250.75m));
+            await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(1250.75m));
             _context.ChangeTracker.Clear();
 
-            var tripServices = new TripServices(
-                _context,
-                new LoggerFactory().CreateLogger<TripServices>(),
-                new FakeCancellationTokenAccessor());
-
             // Act
-            var result = await tripServices.GetTripRoutesAsync(user.Id);
+            var result = await _sut.GetTripRoutesAsync(user.Id);
 
             // Assert
             var returned = result.Data!.Single().Segments.Single();
@@ -336,7 +331,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenRouteCrossesTheAntimeridian_ShouldStorePointsUnchanged()
+        public async Task UpdateSegmentRouteAsync_WhenRouteCrossesTheAntimeridian_ShouldStorePointsUnchanged()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -345,7 +340,7 @@ namespace Tests.Services
             var points = new[] { (-18.14, 178.44), (-17.00, 179.90), (-16.50, -179.90), (-13.83, -171.76) };
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(1200.00m, false, points));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1200.00m, false, points));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -357,7 +352,7 @@ namespace Tests.Services
 
         #region Ownership
         [Test]
-        public async Task UpdateRouteAsync_WhenSegmentBelongsToAnotherUser_ShouldReturnNotFoundAndKeepRoute()
+        public async Task UpdateSegmentRouteAsync_WhenSegmentBelongsToAnotherUser_ShouldReturnNotFoundAndKeepRoute()
         {
             // Arrange
             var owner = await AddUserAsync();
@@ -366,7 +361,7 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(other.Id, segment.Id, KrakowToRome());
+            var result = await _sut.UpdateSegmentRouteAsync(other.Id, segment.Id, KrakowToRome());
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -380,14 +375,14 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenSegmentDoesNotExist_ShouldReturnNotFound()
+        public async Task UpdateSegmentRouteAsync_WhenSegmentDoesNotExist_ShouldReturnNotFound()
         {
             // Arrange
             var user = await AddUserAsync();
             var segmentId = Guid.NewGuid();
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segmentId, KrakowToRome());
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segmentId, KrakowToRome());
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -397,7 +392,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenSegmentIsDeleted_ShouldReturnNotFound()
+        public async Task UpdateSegmentRouteAsync_WhenSegmentIsDeleted_ShouldReturnNotFound()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -407,7 +402,7 @@ namespace Tests.Services
             await _context.SaveChangesAsync();
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome());
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome());
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -417,7 +412,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenTripIsDeleted_ShouldReturnNotFoundAndKeepRoute()
+        public async Task UpdateSegmentRouteAsync_WhenTripIsDeleted_ShouldReturnNotFoundAndKeepRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -428,7 +423,7 @@ namespace Tests.Services
             _context.ChangeTracker.Clear();
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome());
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome());
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -443,7 +438,7 @@ namespace Tests.Services
 
         #region Route endpoints
         [Test]
-        public async Task UpdateRouteAsync_WhenRouteStartsFarFromOrigin_ShouldReturnEndpointsMismatchAndKeepRoute()
+        public async Task UpdateSegmentRouteAsync_WhenRouteStartsFarFromOrigin_ShouldReturnEndpointsMismatchAndKeepRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -451,7 +446,7 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (50.16, 19.94), (41.90, 12.49)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (50.16, 19.94), (41.90, 12.49)));
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -464,7 +459,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenRouteEndsFarFromDestination_ShouldReturnEndpointsMismatch()
+        public async Task UpdateSegmentRouteAsync_WhenRouteEndsFarFromDestination_ShouldReturnEndpointsMismatch()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -472,14 +467,14 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (50.06, 19.94), (41.80, 12.49)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (50.06, 19.94), (41.80, 12.49)));
 
             // Assert
             await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.RouteEndpointsMismatch);
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenRouteIsReversed_ShouldReturnEndpointsMismatch()
+        public async Task UpdateSegmentRouteAsync_WhenRouteIsReversed_ShouldReturnEndpointsMismatch()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -487,14 +482,14 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (41.90, 12.49), (50.06, 19.94)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (41.90, 12.49), (50.06, 19.94)));
 
             // Assert
             await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.RouteEndpointsMismatch);
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenEndpointsAreWithinTolerance_ShouldStoreRoute()
+        public async Task UpdateSegmentRouteAsync_WhenEndpointsAreWithinTolerance_ShouldStoreRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -502,7 +497,7 @@ namespace Tests.Services
             var segment = await AddSegmentAsync(trip);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (50.14, 19.94), (41.82, 12.49)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1300.00m, false, (50.14, 19.94), (41.82, 12.49)));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -511,7 +506,7 @@ namespace Tests.Services
 
         #region Distance
         [Test]
-        public async Task UpdateRouteAsync_WhenDistanceIsShorterThanRouteLength_ShouldReturnDistanceInvalidAndKeepRoute()
+        public async Task UpdateSegmentRouteAsync_WhenDistanceIsShorterThanRouteLength_ShouldReturnDistanceInvalidAndKeepRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -520,7 +515,7 @@ namespace Tests.Services
             var tooShort = Math.Round(RouteKm((50.06, 19.94), (46.00, 16.00), (41.90, 12.49)) * 0.98m, 2);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome(tooShort));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(tooShort));
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -532,7 +527,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenDistanceIsWithinToleranceOfRouteLength_ShouldStoreRoute()
+        public async Task UpdateSegmentRouteAsync_WhenDistanceIsWithinToleranceOfRouteLength_ShouldStoreRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -541,7 +536,7 @@ namespace Tests.Services
             var slightlyShort = Math.Round(RouteKm((50.06, 19.94), (46.00, 16.00), (41.90, 12.49)) * 0.995m, 2);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, KrakowToRome(slightlyShort));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(slightlyShort));
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
@@ -551,7 +546,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenRouteLineIsLongerThanDistance_ShouldReturnDistanceInvalid()
+        public async Task UpdateSegmentRouteAsync_WhenRouteLineIsLongerThanDistance_ShouldReturnDistanceInvalid()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -560,7 +555,7 @@ namespace Tests.Services
             var straightLine = Math.Round(RouteKm((50.06, 19.94), (41.90, 12.49)), 2);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(straightLine, false, (50.06, 19.94), (44.00, 28.00), (41.90, 12.49)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(straightLine, false, (50.06, 19.94), (44.00, 28.00), (41.90, 12.49)));
 
             // Assert
             await Assert.That(result.IsSuccess).IsFalse();
@@ -569,7 +564,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task UpdateRouteAsync_WhenShortDistanceIsRoundedDown_ShouldStoreRoute()
+        public async Task UpdateSegmentRouteAsync_WhenShortDistanceIsRoundedDown_ShouldStoreRoute()
         {
             // Arrange
             var user = await AddUserAsync();
@@ -578,11 +573,180 @@ namespace Tests.Services
             var roundedDown = Math.Round(RouteKm((50.06, 19.94), (50.06273, 19.94)), 2);
 
             // Act
-            var result = await _sut.UpdateRouteAsync(user.Id, segment.Id, Command(roundedDown, false, (50.06, 19.94), (50.06273, 19.94)));
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(roundedDown, false, (50.06, 19.94), (50.06273, 19.94)));
 
             // Assert
             await Assert.That(roundedDown).IsEqualTo(0.30m);
             await Assert.That(result.IsSuccess).IsTrue();
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenDistanceIsMoreThanMaxRatioOfRouteLength_ShouldReturnDistanceInvalidAndKeepRoute()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+            var tooLong = Math.Round(RouteKm((50.06, 19.94), (46.00, 16.00), (41.90, 12.49)) * 1.51m, 2);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(tooLong));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.DistanceInvalid);
+
+            var stored = await ReloadSegmentAsync(segment.Id);
+            await Assert.That(stored.DistanceKm).IsEqualTo(1.00m);
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenDistanceIsWithinMaxRatioOfRouteLength_ShouldStoreRoute()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+            var longer = Math.Round(RouteKm((50.06, 19.94), (46.00, 16.00), (41.90, 12.49)) * 1.49m, 2);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome(longer));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var stored = await ReloadSegmentAsync(segment.Id);
+            await Assert.That(stored.DistanceKm).IsEqualTo(longer);
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenFallbackDistanceIsLongerThanTheLine_ShouldReturnDistanceInvalid()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+            var longer = Math.Round(RouteKm((50.06, 19.94), (41.90, 12.49)) * 1.05m, 2);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(longer, true, (50.06, 19.94), (41.90, 12.49)));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.DistanceInvalid);
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenFallbackDistanceMatchesTheLine_ShouldStoreRoute()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+            var line = Math.Round(RouteKm((50.06, 19.94), (41.90, 12.49)), 2);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(line, true, (50.06, 19.94), (41.90, 12.49)));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+        }
+        #endregion
+
+        #region Route points
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenRouteHasConsecutiveDuplicatePoints_ShouldStoreEachPointOnce()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1250.75m, false, (50.06, 19.94), (50.06, 19.94), (46.00, 16.00), (46.00, 16.00), (46.00, 16.00), (41.90, 12.49)));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+
+            var stored = await ReloadSegmentAsync(segment.Id);
+            await Assert.That(stored.Geometry.Coordinates.Select(c => (c.Y, c.X)).SequenceEqual(new[] { (50.06, 19.94), (46.00, 16.00), (41.90, 12.49) })).IsTrue();
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenAllPointsAreTheSame_ShouldReturnRouteInvalidAndKeepRoute()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip, TransportTypeEnum.Car, _krakow, _krakow);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(0.01m, false, (50.06, 19.94), (50.06, 19.94), (50.06, 19.94)));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.RouteInvalid);
+
+            var stored = await ReloadSegmentAsync(segment.Id);
+            await Assert.That(stored.DistanceKm).IsEqualTo(1.00m);
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenRouteHasOnePoint_ShouldReturnRouteInvalid()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, Command(1.00m, false, (50.06, 19.94)));
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.RouteInvalid);
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_WhenCoordinatesAreNull_ShouldReturnRouteInvalid()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+            var command = new UpdateSegmentRouteCommand
+            {
+                Coordinates = null!,
+                DistanceKm = 1.00m,
+                IsFallbackRoute = false
+            };
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.RouteInvalid);
+        }
+
+        [Test]
+        public async Task UpdateSegmentRouteAsync_ShouldNotTrackSegmentPlaces()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var trip = await AddTripAsync(user);
+            var segment = await AddSegmentAsync(trip);
+            _context.ChangeTracker.Clear();
+
+            // Act
+            var result = await _sut.UpdateSegmentRouteAsync(user.Id, segment.Id, KrakowToRome());
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(_context.ChangeTracker.Entries<Place>().Count()).IsEqualTo(0);
         }
         #endregion
     }

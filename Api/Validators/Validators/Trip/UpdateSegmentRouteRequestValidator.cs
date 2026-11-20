@@ -13,14 +13,16 @@ namespace Api.Validators.Validators.Trip
                 .NotNull()
                 .WithErrorCode(ErrorCodes.RouteInvalid);
 
-            RuleFor(x => x.Coordinates.Count)
-                .ApplyRoutePointCountRules()
-                .When(x => x.Coordinates != null)
-                .DependentRules(() =>
-                {
-                    RuleForEach(x => x.Coordinates)
-                        .ApplyRoutePointRules();
-                });
+            When(x => x.Coordinates != null, () =>
+            {
+                RuleFor(x => x.Coordinates.Count)
+                    .ApplyRoutePointCountRules()
+                    .DependentRules(() =>
+                    {
+                        RuleForEach(x => x.Coordinates)
+                            .ApplyRoutePointRules();
+                    });
+            });
 
             RuleFor(x => x.DistanceKm)
                 .ApplyRouteDistanceRules();

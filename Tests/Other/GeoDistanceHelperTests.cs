@@ -61,6 +61,26 @@ namespace Tests.Other
         }
 
         [Test]
+        public async Task HaversineKm_WhenPointsAreKrakowAndRome_ShouldReturnTheGreatCircleDistance()
+        {
+            // Act
+            var distance = GeoDistanceHelper.HaversineKm(50.06, 19.94, 41.90, 12.49);
+
+            // Assert
+            await Assert.That(distance).IsEqualTo(1073.3456118363554).Within(Tolerance);
+        }
+
+        [Test]
+        public async Task HaversineKm_WhenPointsAreOnTheSameParallelAwayFromTheEquator_ShouldScaleLongitudeByLatitude()
+        {
+            // Act
+            var distance = GeoDistanceHelper.HaversineKm(60, 0, 60, 10);
+
+            // Assert
+            await Assert.That(distance).IsEqualTo(555.4451329718406).Within(Tolerance);
+        }
+
+        [Test]
         public async Task HaversineKm_WhenPointsAreOneDegreeApartOnAMeridian_ShouldReturnOneDegreeOfArc()
         {
             // Act

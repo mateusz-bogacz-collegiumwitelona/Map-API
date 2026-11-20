@@ -3,7 +3,7 @@ using Api.Request.Trip;
 
 namespace Tests.Mappers
 {
-    internal class TripMapperTest
+    public class TripMapperTest
     {
         private readonly TripMapper _mapper = new();
 
@@ -41,7 +41,7 @@ namespace Tests.Mappers
         [Test]
         [Arguments("12.344", "12.34")]
         [Arguments("12.345", "12.35")]
-        [Arguments("12.3", "12.30")]
+        [Arguments("12.3", "12.3")]
         [Arguments("1096.505", "1096.51")]
         public async Task MapUpdateSegmentRoute_ShouldRoundDistanceToTwoDecimalPlaces(string distance, string expected)
         {
