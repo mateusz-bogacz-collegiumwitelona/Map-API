@@ -48,7 +48,7 @@ namespace Tests.Other
             using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS unaccent;";
+            cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS pg_trgm;";
             await cmd.ExecuteNonQueryAsync();
         }
 

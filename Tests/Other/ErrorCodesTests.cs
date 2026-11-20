@@ -40,6 +40,7 @@ namespace Tests.Other
             await Assert.That(ErrorCodes.EmailUnchanged).IsEqualTo("USR_006");
             await Assert.That(ErrorCodes.EmailAlreadyExist).IsEqualTo("USR_007");
             await Assert.That(ErrorCodes.UserNotFound).IsEqualTo("USR_008");
+            await Assert.That(ErrorCodes.SortInvalid).IsEqualTo("USR_009");
             #endregion
 
             #region Verification
@@ -105,6 +106,7 @@ namespace Tests.Other
                 ErrorCodes.EmailUnchanged,
                 ErrorCodes.EmailAlreadyExist,
                 ErrorCodes.UserNotFound,
+                ErrorCodes.SortInvalid,
                 #endregion
 
                 #region Trip

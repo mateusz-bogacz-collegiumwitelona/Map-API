@@ -56,6 +56,20 @@ namespace Api.Controllers
             return HandleResult(result);
         }
 
+        [EndpointSummary("Search public user profiles")]
+        [EndpointDescription("Returns a paginated list of active, public user profiles matching the query by first or last name. Matching is case-insensitive and partial; multi-word queries require every word to match either name. Supports sorting by name or registration date and returns summary fields only.")]
+        [ProducesResponseType(typeof(Result<PagedResult<UserSummaryResponse>>), StatusCodes.Status200OK)]
+        [HttpGet("search")]
+        [Authorize]
+        public async Task<IActionResult> SearchUsersAsync(
+            [FromQuery] UserSearchRequest request,
+            [FromServices] IUserServices user,
+            [FromServices] UserMapper mapper)
+        {
+            var result = await user.SearchUsersAsync(mapper.MapUserSearch(request));
+            return HandleResult(result);
+        }
+
         [EndpointSummary("Request an email address change")]
         [EndpointDescription("Sends a 6-digit verification code to the new email address. The current email address stays active for signing in until the change is confirmed. Returns 409 when the address is already in use and 429 when a code was requested less than a minute ago. Available only for accounts with the User role.")]
         [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]

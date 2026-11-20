@@ -29,6 +29,7 @@ namespace Infrastructure
 
             builder.HasPostgresExtension("postgis");
             builder.HasPostgresExtension("unaccent");
+            builder.HasPostgresExtension("pg_trgm");
 
             builder.Entity<User>().ToTable("Users");
 
