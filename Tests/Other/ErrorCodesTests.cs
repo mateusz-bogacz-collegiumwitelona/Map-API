@@ -50,6 +50,9 @@ namespace Tests.Other
 
             #region Trip
             await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
+            await Assert.That(ErrorCodes.RouteInvalid).IsEqualTo("TRIP_008");
+            await Assert.That(ErrorCodes.DistanceInvalid).IsEqualTo("TRIP_009");
+            await Assert.That(ErrorCodes.RouteEndpointsMismatch).IsEqualTo("TRIP_010");
             #endregion
 
             #region Ban / Report
@@ -109,6 +112,9 @@ namespace Tests.Other
 
                 #region Trip
                 ErrorCodes.YearInvalid,
+                ErrorCodes.RouteInvalid,
+                ErrorCodes.DistanceInvalid,
+                ErrorCodes.RouteEndpointsMismatch,
                 #endregion
 
                 #region Verification
