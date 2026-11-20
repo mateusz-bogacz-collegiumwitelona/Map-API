@@ -7,6 +7,7 @@ namespace Api.Mappers
     [Mapper]
     public partial class ListMapper
     {
+        public partial ReportListCommand ToReportList(ReportListRequest request);
         public partial BasicListCommand MapBasicList(BasicListRequest request);
     }
 }

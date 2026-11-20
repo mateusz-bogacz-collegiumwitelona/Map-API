@@ -16,7 +16,6 @@ using Npgsql;
 using Services.Accessors.Interfaces;
 using Services.Command.Account;
 using Services.Command.Auth;
-using Services.Commands.Auth;
 using Services.Interfaces;
 using Services.Interfaces.Auth;
 using Services.Options;
