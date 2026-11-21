@@ -152,13 +152,13 @@ namespace Services.Services
             return user;
         }
 
-        public async Task<Result<PagedResult<UserListResponse>>> GetUserListAsnyc(UserListCommand command)
+        public async Task<Result<PagedResult<UserReportListResponse>>> GetUserListAsync(UserListCommand command)
             => await _context.Users
                 .AsNoTracking()
                 .ApplySearch(command.SearchTerm, _context)
                 .ApplyFilter(command.IncludeBanned, command.IncludeAdmins, _context)
                 .ApplySorting(command.SortBy, command.SortDescending)
-                .Select(u => new UserListResponse
+                .Select(u => new UserReportListResponse
                 {
                     Id = u.Id,
                     FirstName = u.FirstName,

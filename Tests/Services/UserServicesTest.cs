@@ -435,7 +435,7 @@ namespace Tests.Services
             };
 
             // Act
-            var result = await _userServicesMock.GetUserListAsnyc(command);
+            var result = await _userServicesMock.GetUserListAsync(command);
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -472,7 +472,7 @@ namespace Tests.Services
             };
 
             // Act
-            var result = await _userServicesMock.GetUserListAsnyc(command);
+            var result = await _userServicesMock.GetUserListAsync(command);
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -510,7 +510,7 @@ namespace Tests.Services
             };
 
             // Act
-            var result = await _userServicesMock.GetUserListAsnyc(command);
+            var result = await _userServicesMock.GetUserListAsync(command);
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -540,21 +540,21 @@ namespace Tests.Services
             await _contextMock.SaveChangesAsync();
 
             // Act 
-            var resultByName = await _userServicesMock.GetUserListAsnyc(new UserListCommand
+            var resultByName = await _userServicesMock.GetUserListAsync(new UserListCommand
             {
                 SearchTerm = "lukasz zolc",
                 PageNumber = 1,
                 PageSize = 10
             });
 
-            var resultByEmail = await _userServicesMock.GetUserListAsnyc(new UserListCommand
+            var resultByEmail = await _userServicesMock.GetUserListAsync(new UserListCommand
             {
                 SearchTerm = "FIRMA.PL",
                 PageNumber = 1,
                 PageSize = 10
             });
 
-            var resultByRole = await _userServicesMock.GetUserListAsnyc(new UserListCommand
+            var resultByRole = await _userServicesMock.GetUserListAsync(new UserListCommand
             {
                 SearchTerm = "moder",
                 PageNumber = 1,
@@ -592,7 +592,7 @@ namespace Tests.Services
             };
 
             // Act
-            var result = await _userServicesMock.GetUserListAsnyc(command);
+            var result = await _userServicesMock.GetUserListAsync(command);
 
             // Assert 
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -618,7 +618,7 @@ namespace Tests.Services
             };
 
             // Act
-            var result = await _userServicesMock.GetUserListAsnyc(command);
+            var result = await _userServicesMock.GetUserListAsync(command);
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -646,7 +646,7 @@ namespace Tests.Services
             };
 
             // Act
-            var result = await _userServicesMock.GetUserListAsnyc(command);
+            var result = await _userServicesMock.GetUserListAsync(command);
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);

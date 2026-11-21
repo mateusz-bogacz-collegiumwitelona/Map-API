@@ -1,6 +1,6 @@
 ﻿namespace Services.Response.User
 {
-    public sealed record UserListResponse
+    public sealed record UserReportListResponse
     {
         public required Guid Id { get; init; }
         public required string FirstName { get; init; }
