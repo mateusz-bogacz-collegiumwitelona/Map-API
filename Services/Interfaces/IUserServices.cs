@@ -10,9 +10,9 @@ namespace Services.Interfaces
         Task<Result<UserResponse>> GetUserProfileAsync(Guid currentUserId, Guid? targetUserId = null, CancellationToken ct = default);
         Task<Result> EditUserAsync(Guid userId, EditUserCommand command, CancellationToken ct = default);
         Task<Result> SetProfileVisibilityAsync(Guid userId, bool isPublic, CancellationToken ct = default);
-        Task<Result<PagedResult<UserReportListResponse>>> GetUserListAsync(UserListCommand command);
+        Task<Result<PagedResult<UserListResponse>>> GetUserListAsync(UserListCommand command);
         Task<Result<UserDetailResponse>> GetUserDetailAsync(Guid userId);
         Task<Result<UserBanDetailResponse>> GetUserBanDetailAsync(Guid userId);
-        Task<Result<PagedResult<UserReportListRespone>>> GetUserReportListAsync(Guid userId, SimpleListCommand command);
+        Task<Result<PagedResult<UserReportListResponse>>> GetUserReportListAsync(Guid userId, SimpleListCommand command);
     }
 }

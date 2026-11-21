@@ -1,4 +1,5 @@
-﻿using Domain.Exceptions;
+﻿using Domain.Const;
+using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
 using Infrastructure.Interceptors;
@@ -524,19 +525,10 @@ namespace Tests.Services
         public async Task GetUserListAsync_WhenSearchTermHasDiacriticsOrMixedCase_ShouldFilterCaseAndAccentInsensitively()
         {
             // Arrange
-            var moderatorRole = new Microsoft.AspNetCore.Identity.IdentityRole<Guid> { Id = Guid.NewGuid(), Name = "Moderator", NormalizedName = "MODERATOR" };
-            await _contextMock.Roles.AddAsync(moderatorRole);
-
             var user1 = new User { Id = Guid.NewGuid(), FirstName = "Łukasz", LastName = "Żółć", Email = "lukasz@example.com" };
             var user2 = new User { Id = Guid.NewGuid(), FirstName = "Katarzyna", LastName = "Nowak", Email = "kasia@firma.pl" };
-            var user3 = new User { Id = Guid.NewGuid(), FirstName = "Tomasz", LastName = "Zieliński", Email = "tomek@example.com" };
 
-            await _contextMock.Users.AddRangeAsync(user1, user2, user3);
-            await _contextMock.UserRoles.AddAsync(new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid>
-            {
-                UserId = user3.Id,
-                RoleId = moderatorRole.Id
-            });
+            await _contextMock.Users.AddRangeAsync(user1, user2);
             await _contextMock.SaveChangesAsync();
 
             // Act 
@@ -554,22 +546,12 @@ namespace Tests.Services
                 PageSize = 10
             });
 
-            var resultByRole = await _userServicesMock.GetUserListAsync(new UserListCommand
-            {
-                SearchTerm = "moder",
-                PageNumber = 1,
-                PageSize = 10
-            });
-
             // Assert
             await Assert.That(resultByName.Data!.TotalCount).IsEqualTo(1);
             await Assert.That(resultByName.Data.Items[0].Id).IsEqualTo(user1.Id);
 
             await Assert.That(resultByEmail.Data!.TotalCount).IsEqualTo(1);
             await Assert.That(resultByEmail.Data.Items[0].Id).IsEqualTo(user2.Id);
-
-            await Assert.That(resultByRole.Data!.TotalCount).IsEqualTo(1);
-            await Assert.That(resultByRole.Data.Items[0].Id).IsEqualTo(user3.Id);
         }
 
         [Test]
@@ -882,7 +864,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task GetUserReportListAsync_WhenUserDoesNotExist_ShouldReturnEmptyPagedResult()
+        public async Task GetUserReportListAsync_WhenUserDoesNotExist_ShouldReturnNotFound()
         {
             // Arrange
             var nonExistentUserId = Guid.NewGuid();
@@ -892,10 +874,9 @@ namespace Tests.Services
             var result = await _userServicesMock.GetUserReportListAsync(nonExistentUserId, command);
 
             // Assert
-            await Assert.That(result.IsSuccess).IsTrue();
-            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
-            await Assert.That(result.Data!.Items).IsEmpty();
-            await Assert.That(result.Data.TotalCount).IsEqualTo(0);
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
         }
 
         [Test]

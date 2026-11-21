@@ -153,7 +153,7 @@ namespace Api.Controllers
             "including details such as report ID, type, status, and creation date. " +
             "Available only for accounts with the Admin role.")]
         [HttpGet("detail/{userId:guid}/report")]
-        [ProducesResponseType(typeof(Result<PagedResult<UserReportListRespone>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<PagedResult<UserReportListResponse>>), StatusCodes.Status200OK)]
         [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
         public async Task<IActionResult> GetUserReportListAsync(
             [FromServices] IUserServices user,

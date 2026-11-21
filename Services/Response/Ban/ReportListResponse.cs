@@ -2,10 +2,10 @@
 
 namespace Services.Response.Ban
 {
-    public sealed record ReportListResponse : UserReportListRespone
+    public sealed record ReportListResponse : UserReportListResponse
     {
         public required Guid ReportedUserId { get; init; }
-        public required string ReportedFirstName { get; init; }
-        public required string ReportedLastName { get; init; }
+        public required string FirstName { get; init; }
+        public required string LastName { get; init; }
     }
 }

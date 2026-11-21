@@ -1,14 +1,13 @@
-﻿namespace Services.Response.User
+﻿using Domain.Enum;
+
+namespace Services.Response.User
 {
-    public sealed record UserReportListResponse
+    public record UserReportListResponse
     {
         public required Guid Id { get; init; }
-        public required string FirstName { get; init; }
-        public required string LastName { get; init; }
-        public required string Role { get; init; }
-        public bool IsBanned { get; init; }
-        public DateTime? BannedUntil { get; init; }
+        public required string Reason { get; init; }
+        public required ReportStatusEnum Status { get; init; }
         public required DateTime CreatedAt { get; init; }
-        public required DateTime? UpdatedAt { get; init; }
+        public DateTime? ResolvedAt { get; init; }
     }
 }

@@ -584,8 +584,8 @@ namespace Tests.Services
             var item = result.Data!.Items.Single();
             await Assert.That(item.Id).IsEqualTo(report.Id);
             await Assert.That(item.ReportedUserId).IsEqualTo(reported.Id);
-            await Assert.That(item.ReportedFirstName).IsEqualTo("Anna");
-            await Assert.That(item.ReportedLastName).IsEqualTo("Nowak");
+            await Assert.That(item.FirstName).IsEqualTo("Anna");
+            await Assert.That(item.LastName).IsEqualTo("Nowak");
             await Assert.That(item.Reason).IsEqualTo("Harassment");
             await Assert.That(item.Status).IsEqualTo(ReportStatusEnum.Pending);
             await Assert.That(item.CreatedAt).IsEqualTo(report.CreatedAt);

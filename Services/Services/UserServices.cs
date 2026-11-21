@@ -152,13 +152,13 @@ namespace Services.Services
             return user;
         }
 
-        public async Task<Result<PagedResult<UserReportListResponse>>> GetUserListAsync(UserListCommand command)
+        public async Task<Result<PagedResult<UserListResponse>>> GetUserListAsync(UserListCommand command)
             => await _context.Users
                 .AsNoTracking()
-                .ApplySearch(command.SearchTerm, _context)
+                .ApplySearch(command.SearchTerm)
                 .ApplyFilter(command.IncludeBanned, command.IncludeAdmins, _context)
                 .ApplySorting(command.SortBy, command.SortDescending)
-                .Select(u => new UserReportListResponse
+                .Select(u => new UserListResponse
                 {
                     Id = u.Id,
                     FirstName = u.FirstName,
@@ -197,8 +197,7 @@ namespace Services.Services
                             r => r.Id,
                             (ur, r) => r.Name)
                         .FirstOrDefault() ?? string.Empty,
-                    u.IsPublic,
-                    u.IsBanned
+                    u.IsPublic
                 })
                 .FirstOrDefaultAsync(_ct);
 
@@ -235,14 +234,16 @@ namespace Services.Services
             );
         }
 
-        public async Task<Result<UserBanDetailResponse>> GetUserBanDetailAsync(Guid userId) 
+        public async Task<Result<UserBanDetailResponse>> GetUserBanDetailAsync(Guid userId)
         {
+            var now = DateTime.UtcNow;
+
             var response = await _context.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userId)
                 .Select(u => new UserBanDetailResponse
                 {
-                    IsBanned = u.IsBanned,
+                    IsBanned = u.IsBanned && (u.BannedUntil == null || u.BannedUntil > now),
                     BannedUntil = u.BannedUntil,
                     BannedReason = u.BannedReason
                 })
@@ -265,12 +266,27 @@ namespace Services.Services
             );
         }
 
-        public async Task<Result<PagedResult<UserReportListRespone>>> GetUserReportListAsync(Guid userId, SimpleListCommand command)
-            => await _context.UserReports
+        public async Task<Result<PagedResult<UserReportListResponse>>> GetUserReportListAsync(Guid userId, SimpleListCommand command)
+        {
+            var userExists = await _context.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id == userId, _ct);
+
+            if (!userExists)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result<PagedResult<UserReportListResponse>>.Failure(
+                    message: $"User with ID '{userId}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.NotFound
+                );
+            }
+
+           return await _context.UserReports
                 .AsNoTracking()
                 .ApplySorting(command.SortBy, command.SortDescending)
                 .Where(r => r.ReportedUserId == userId)
-                .Select(r => new UserReportListRespone
+                .Select(r => new UserReportListResponse
                 {
                     Id = r.Id,
                     Reason = r.Reason,
@@ -279,6 +295,6 @@ namespace Services.Services
                     ResolvedAt = r.ResolvedAt
                 })
             .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "UserReportList", _ct);
-
+        }
     }
 }
