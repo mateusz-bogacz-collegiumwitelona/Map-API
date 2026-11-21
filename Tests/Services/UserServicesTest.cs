@@ -446,7 +446,7 @@ namespace Tests.Services
             await Assert.That(result.Data.Items.Count).IsEqualTo(2);
 
             var janDto = result.Data.Items.First(u => u.Id == regularUser.Id);
-            await Assert.That(janDto.Role).IsEqualTo("User");
+            await Assert.That(janDto.Role).IsEqualTo(RolesConst.User);
             await Assert.That(janDto.IsBanned).IsFalse();
 
             var ewaDto = result.Data.Items.First(u => u.Id == noRoleUser.Id);
@@ -518,7 +518,7 @@ namespace Tests.Services
             await Assert.That(result.Data!.TotalCount).IsEqualTo(2);
 
             var adminDto = result.Data.Items.First(u => u.Id == adminUser.Id);
-            await Assert.That(adminDto.Role).IsEqualTo("Admin");
+            await Assert.That(adminDto.Role).IsEqualTo(RolesConst.Admin);
         }
 
         [Test]

@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain.Const;
+using Domain.Models;
 using Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,7 +48,7 @@ namespace Services.QueryExtension
                 query = query.Where(u => !context.UserRoles
                     .Where(ur => ur.UserId == u.Id)
                     .Join(context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
-                    .Any(roleName => roleName == "Admin"));
+                    .Any(roleName => roleName == RolesConst.Admin));
             }
 
             return query;

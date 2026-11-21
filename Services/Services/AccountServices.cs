@@ -269,7 +269,7 @@ namespace Services.Services
                 throw new InternalServerException($"Failed to create user: {errors}");
             }
 
-            var roleAssign = await _userManager.AddToRoleAsync(newUser, "User");
+            var roleAssign = await _userManager.AddToRoleAsync(newUser, RolesConst.User);
             if (!roleAssign.Succeeded)
             {
                 var errors = string.Join(", ", roleAssign.Errors.Select(e => e.Description));

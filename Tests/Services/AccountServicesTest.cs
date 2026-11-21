@@ -138,7 +138,7 @@ namespace Tests.Services
             await Context.Database.ExecuteSqlRawAsync(createScript);
 
             var roleManager = _scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-            await roleManager.CreateAsync(new IdentityRole<Guid>("User"));
+            await roleManager.CreateAsync(new IdentityRole<Guid>(RolesConst.User));
         }
 
         [After(Test)]
@@ -791,8 +791,8 @@ namespace Tests.Services
             await Assert.That(createdUser.IsPublic).IsEqualTo(command.IsPublic);
 
             var roles = await UserManager.GetRolesAsync(createdUser);
-            await Assert.That(roles).Contains("User");
-            await Assert.That(roles).DoesNotContain("Admin");
+            await Assert.That(roles).Contains(RolesConst.User);
+            await Assert.That(roles).DoesNotContain(RolesConst.Admin);
 
             var verificationCode = await Context.EmailVerificationCodes
                 .AsNoTracking()
@@ -1586,7 +1586,7 @@ namespace Tests.Services
                     $"Could not create user '{email}': {string.Join(", ", createResult.Errors.Select(error => error.Description))}");
             }
 
-            await UserManager.AddToRoleAsync(user, "User");
+            await UserManager.AddToRoleAsync(user, RolesConst.User);
 
             return user;
         }
