@@ -2,6 +2,7 @@
 using Api.Controllers.Base;
 using Api.Mappers;
 using Api.Request.Account;
+using Api.Request.List;
 using Api.Request.User;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -97,6 +98,71 @@ namespace Api.Controllers
             [FromServices] IAccountServices account)
         {
             var result = await account.DeleteAccountAsync(CurrentUserId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Retrieve a paginated list of users")]
+        [EndpointDescription("Returns a paginated list of users with optional accent-insensitive search by first name," +
+            " last name, email, or role. By default, banned users and administrators are excluded unless explicitly " +
+            "included via query flags. Available only for accounts with the Admin role.")]
+        [ProducesResponseType(typeof(Result<PagedResult<UserReportListResponse>>), StatusCodes.Status200OK)]
+        [HttpGet("list")]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserListAsync(
+            [FromServices] IUserServices user,
+            [FromServices] ListMapper mapper,
+            [FromQuery] UserListRequest request
+            )
+        {
+            var result = await user.GetUserListAsync(mapper.MapUserList(request));
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Retrieve detailed information about a specific user")]
+        [EndpointDescription("Returns detailed information about a specific user, " +
+            "including their ID, first name, last name, email, role, and account status. " +
+            "Available only for accounts with the Admin role.")]
+        [HttpGet("detail/{userId:guid}")]
+        [ProducesResponseType(typeof(Result<UserDetailResponse>), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserDetailAsync(
+            [FromServices] IUserServices user,
+            [FromRoute] Guid userId)
+        {
+            var result = await user.GetUserDetailAsync(userId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Get user ban detail")]
+        [EndpointDescription("Returns detailed information about a specific user's ban status, " +
+            "including whether the user is currently banned, the reason for the ban, and the duration of the ban. " +
+            "Available only for accounts with the Admin role.")]
+        [HttpGet("detail/{userId:guid}/ban")]
+        [ProducesResponseType(typeof(Result<UserBanDetailResponse>), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserBanDetailAsync(
+           [FromServices] IUserServices user,
+           [FromRoute] Guid userId)
+        {
+            var result = await user.GetUserBanDetailAsync(userId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Retrieve a paginated list of reports associated with a specific user")]
+        [EndpointDescription("Returns a paginated and sorting list of reports associated with a specific user, " +
+            "including details such as report ID, type, status, and creation date. " +
+            "Available only for accounts with the Admin role.")]
+        [HttpGet("detail/{userId:guid}/report")]
+        [ProducesResponseType(typeof(Result<PagedResult<UserReportListResponse>>), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationConfiguration.AdminPolicy)]
+        public async Task<IActionResult> GetUserReportListAsync(
+            [FromServices] IUserServices user,
+            [FromServices] ListMapper mapper,
+            [FromRoute] Guid userId,
+            [FromQuery] SimpleListRequest request
+            )
+        {
+            var result = await user.GetUserReportListAsync(userId, mapper.ToSimpleList(request));
             return HandleResult(result);
         }
     }

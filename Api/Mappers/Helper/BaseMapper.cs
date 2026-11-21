@@ -27,6 +27,10 @@ namespace Api.Mappers.Helper
 
 
         [UserMapping(Default = false)]
-        protected string Trim(string value) => value.Trim();
+        protected static string? Trim(string? value) => value?.Trim();
+
+        [UserMapping(Default = false)]
+        protected static string? ToLowerCase(string? value) => value?.Trim().ToLowerInvariant();
+
     }
 }

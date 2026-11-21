@@ -1,4 +1,5 @@
 ﻿using Domain.Common;
+using Domain.Const;
 using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
@@ -6,8 +7,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
+using Services.Command.List;
 using Services.Command.User;
+using Services.Helpers;
 using Services.Interfaces;
+using Services.QueryExtension;
 using Services.Response.User;
 
 namespace Services.Services
@@ -17,6 +21,7 @@ namespace Services.Services
         private readonly AppDbContext _context;
         private readonly ILogger<UserServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+        private CancellationToken _ct => _ctAccessor.Token;
 
         public UserServices(
             AppDbContext context,
@@ -145,6 +150,151 @@ namespace Services.Services
             }
 
             return user;
+        }
+
+        public async Task<Result<PagedResult<UserListResponse>>> GetUserListAsync(UserListCommand command)
+            => await _context.Users
+                .AsNoTracking()
+                .ApplySearch(command.SearchTerm)
+                .ApplyFilter(command.IncludeBanned, command.IncludeAdmins, _context)
+                .ApplySorting(command.SortBy, command.SortDescending)
+                .Select(u => new UserListResponse
+                {
+                    Id = u.Id,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+
+                    Role = _context.UserRoles
+                        .Where(ur => ur.UserId == u.Id)
+                        .Join(_context.Roles,
+                            ur => ur.RoleId,
+                            r => r.Id,
+                            (ur, r) => r.Name)
+                        .FirstOrDefault() ?? string.Empty,
+
+                    IsBanned = u.IsBanned,
+                    BannedUntil = u.BannedUntil,
+                    CreatedAt = u.CreatedAt,
+                    UpdatedAt = u.UpdatedAt
+                })
+            .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "UserList", _ct);
+
+        public async Task<Result<UserDetailResponse>> GetUserDetailAsync(Guid userId)
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Email,
+                    Role = _context.UserRoles
+                        .Where(ur => ur.UserId == u.Id)
+                        .Join(_context.Roles,
+                            ur => ur.RoleId,
+                            r => r.Id,
+                            (ur, r) => r.Name)
+                        .FirstOrDefault() ?? string.Empty,
+                    u.IsPublic
+                })
+                .FirstOrDefaultAsync(_ct);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result<UserDetailResponse>.Failure(
+                    message: $"User with ID '{userId}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.NotFound
+                );
+            }
+
+            if (string.IsNullOrWhiteSpace(user.Email))
+            {
+                _logger.LogError("Data integrity violation: User with ID {UserId} does not have an email address.", userId);
+                throw new InternalServerException("User email is required.");
+            }
+
+            var response = new UserDetailResponse
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Role = user.Role,
+                IsPublic = user.IsPublic
+            };
+
+            return Result<UserDetailResponse>.Success(
+                message: "User details retrieved successfully.",
+                data: response,
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
+        public async Task<Result<UserBanDetailResponse>> GetUserBanDetailAsync(Guid userId)
+        {
+            var now = DateTime.UtcNow;
+
+            var response = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new UserBanDetailResponse
+                {
+                    IsBanned = u.IsBanned && (u.BannedUntil == null || u.BannedUntil > now),
+                    BannedUntil = u.BannedUntil,
+                    BannedReason = u.BannedReason
+                })
+                .FirstOrDefaultAsync(_ct);
+
+            if (response == null)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result<UserBanDetailResponse>.Failure(
+                    message: $"User with ID '{userId}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.NotFound
+                );
+            }
+
+            return Result<UserBanDetailResponse>.Success(
+                message: "User ban details retrieved successfully.",
+                data: response,
+                statusCode: StatusCodes.Status200OK
+            );
+        }
+
+        public async Task<Result<PagedResult<UserReportListResponse>>> GetUserReportListAsync(Guid userId, SimpleListCommand command)
+        {
+            var userExists = await _context.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id == userId, _ct);
+
+            if (!userExists)
+            {
+                _logger.LogWarning("User with ID {UserId} not found.", userId);
+                return Result<PagedResult<UserReportListResponse>>.Failure(
+                    message: $"User with ID '{userId}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    errorCode: ErrorCodes.NotFound
+                );
+            }
+
+           return await _context.UserReports
+                .AsNoTracking()
+                .ApplySorting(command.SortBy, command.SortDescending)
+                .Where(r => r.ReportedUserId == userId)
+                .Select(r => new UserReportListResponse
+                {
+                    Id = r.Id,
+                    Reason = r.Reason,
+                    Status = r.Status,
+                    CreatedAt = r.CreatedAt,
+                    ResolvedAt = r.ResolvedAt
+                })
+            .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "UserReportList", _ct);
         }
     }
 }
