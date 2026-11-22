@@ -15,6 +15,7 @@ namespace Services
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
         {
             services.AddScoped<ICancellationTokenAccessor, HttpCancellationTokenAccessor>();
+            services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
 
             services.AddOptions<JwtOptions>()
                 .Bind(configuration.GetSection(JwtOptions.SectionName))

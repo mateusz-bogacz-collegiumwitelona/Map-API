@@ -104,6 +104,7 @@ namespace Tests.Services
             services.AddLogging();
             services.AddScoped<ICancellationTokenAccessor, FakeCancellationTokenAccessor>();
             services.AddScoped<AppDbContext>(_ => new AppDbContext(dbOptions));
+            services.AddScoped<IResourceAuthorizationService, ResourceAuthorizationService>();
 
             services.AddIdentity<User, IdentityRole<Guid>>(options =>
             {

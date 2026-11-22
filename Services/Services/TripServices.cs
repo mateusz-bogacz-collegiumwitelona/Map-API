@@ -1,6 +1,5 @@
 using Domain.Common;
 using Domain.Const;
-using Domain.Exceptions;
 using Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -21,22 +20,25 @@ namespace Services.Services
         private readonly AppDbContext _context;
         private readonly ILogger<TripServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+        private readonly IResourceAuthorizationService _authorization;
 
         private CancellationToken _ct => _ctAccessor.Token;
 
         public TripServices(
             AppDbContext context,
             ILogger<TripServices> logger,
-            ICancellationTokenAccessor ctAccessor)
+            ICancellationTokenAccessor ctAccessor,
+            IResourceAuthorizationService authorization)
         {
             _context = context;
             _logger = logger;
             _ctAccessor = ctAccessor;
+            _authorization = authorization;
         }
 
         public async Task<Result<List<TripRouteResponse>>> GetTripRoutesAsync(Guid currentUserId, Guid? targetUserId = null, int? year = null)
         {
-            var resolvedUserId = await EnsureCanReadAsync(currentUserId, targetUserId);
+            var resolvedUserId = await _authorization.EnsureCanReadProfileAsync(currentUserId, targetUserId, _ct);
 
             var trips = await _context.Trips
                 .AsNoTracking()
@@ -76,7 +78,7 @@ namespace Services.Services
 
         public async Task<Result<List<VisitedCountryResponse>>> GetVisitedCountriesAsync(Guid currentUserId, Guid? targetUserId = null, int? year = null)
         {
-            var resolvedUserId = await EnsureCanReadAsync(currentUserId, targetUserId);
+            var resolvedUserId = await _authorization.EnsureCanReadProfileAsync(currentUserId, targetUserId, _ct);
 
             var visits = await _context.VisitedCountries
                 .AsNoTracking()
@@ -136,11 +138,14 @@ namespace Services.Services
 
         public async Task<Result<PagedResult<TripSummaryResponse>>> GetUserTripsAsync(
           BasicListCommand command,
-          Guid userId,
+          Guid currentUserId,
+          Guid? targetUserId = null,
           CancellationToken ct = default)
         {
             var token = _ctAccessor.ResolveCancellationToken(ct);
             token.ThrowIfCancellationRequested();
+
+            var userId = await _authorization.EnsureCanReadProfileAsync(currentUserId, targetUserId, token);
 
             return await _context.Trips
                 .AsNoTracking()
@@ -168,22 +173,6 @@ namespace Services.Services
                         .ToList()
                 })
                 .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Trips", token);
-        }
-
-        private async Task<Guid> EnsureCanReadAsync(Guid currentUserId, Guid? targetUserId)
-        {
-            var resolvedUserId = targetUserId ?? currentUserId;
-            var isOwner = resolvedUserId == currentUserId;
-
-            var canRead = await _context.Users
-                .AnyAsync(u => u.Id == resolvedUserId && (isOwner || u.IsPublic), _ct);
-
-            if (!canRead)
-            {
-                throw new NotFoundException($"User with ID '{resolvedUserId}' was not found.");
-            }
-
-            return resolvedUserId;
         }
 
         private static List<GeoCoordinate> ToCoordinates(Geometry geometry)

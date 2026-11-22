@@ -17,15 +17,18 @@ namespace Services.Services
         private readonly AppDbContext _context;
         private readonly ILogger<UserServices> _logger;
         private readonly ICancellationTokenAccessor _ctAccessor;
+        private readonly IResourceAuthorizationService _authorization;
 
         public UserServices(
             AppDbContext context,
             ILogger<UserServices> logger,
-            ICancellationTokenAccessor ctAccessor)
+            ICancellationTokenAccessor ctAccessor,
+            IResourceAuthorizationService authorization)
         {
             _context = context;
             _logger = logger;
             _ctAccessor = ctAccessor;
+            _authorization = authorization;
         }
 
         public async Task<Result<UserResponse>> GetUserProfileAsync(
@@ -36,8 +39,7 @@ namespace Services.Services
         {
             var token = _ctAccessor.ResolveCancellationToken(ct);
 
-            var resolvedUserId = targetUserId ?? currentUserId;
-            var isOwner = resolvedUserId == currentUserId;
+            var resolvedUserId = await _authorization.EnsureCanReadProfileAsync(currentUserId, targetUserId, token);
 
             var user = await _context.Users
                 .AsNoTracking()
@@ -52,7 +54,7 @@ namespace Services.Services
                 })
                 .FirstOrDefaultAsync(token);
 
-            if (user == null || (!isOwner && !user.IsPublic))
+            if (user == null)
             {
                 throw new NotFoundException($"User with ID '{resolvedUserId}' was not found.");
             }
@@ -66,7 +68,7 @@ namespace Services.Services
                 IsPublic = user.IsPublic
             };
 
-            _logger.LogInformation("User profile retrieved for user ID: {UserId}, IsOwner: {IsOwner}", resolvedUserId, isOwner);
+            _logger.LogInformation("User profile retrieved for user ID: {UserId}", resolvedUserId);
             return Result<UserResponse>.Success(
                 message: "User data retrieved successfully.",
                 data: response,
