@@ -106,7 +106,8 @@ namespace Tests.Services
             _sut = new TripServices(
                 _context,
                 new LoggerFactory().CreateLogger<TripServices>(),
-                new FakeCancellationTokenAccessor());
+                new FakeCancellationTokenAccessor(),
+                new ResourceAuthorizationService(_context));
         }
 
         [After(Test)]
@@ -860,6 +861,83 @@ namespace Tests.Services
 
             // Assert
             await Assert.That(json).Contains("\"transportTypes\":[\"Car\",\"Plane\"]");
+        }
+
+        [Test]
+        public async Task GetUserTripsAsync_WhenOwnerProfileIsPrivate_ShouldReturnOwnTrips()
+        {
+            // Arrange
+            var owner = await AddUserAsync(isPublic: false);
+            var trip = await AddTripAsync(owner, Utc(2025, 1, 1));
+
+            // Act
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), owner.Id);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.Items.Single().Id).IsEqualTo(trip.Id);
+        }
+
+        [Test]
+        public async Task GetUserTripsAsync_WhenTargetProfileIsPublic_ShouldReturnOnlyTargetTrips()
+        {
+            // Arrange
+            var requester = await AddUserAsync(isPublic: false);
+            var target = await AddUserAsync(isPublic: true);
+            var targetTrip = await AddTripAsync(target, Utc(2025, 1, 1), "Target trip");
+            await AddTripAsync(requester, Utc(2024, 1, 1), "Requester trip");
+            await AddTripAsync(await AddUserAsync(isPublic: false), Utc(2023, 1, 1), "Third party trip");
+
+            // Act
+            var result = await _sut.GetUserTripsAsync(new BasicListCommand(), requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.TotalCount).IsEqualTo(1);
+            await Assert.That(result.Data.Items.Single().Id).IsEqualTo(targetTrip.Id);
+        }
+
+        [Test]
+        public async Task GetUserTripsAsync_WhenTargetProfileIsPrivate_ShouldThrowNotFoundException()
+        {
+            // Arrange
+            var requester = await AddUserAsync(isPublic: false);
+            var target = await AddUserAsync(isPublic: false);
+            await AddTripAsync(target, Utc(2025, 1, 1));
+
+            // Act & Assert
+            await Assert.That(async () => await _sut.GetUserTripsAsync(new BasicListCommand(), requester.Id, target.Id))
+                .Throws<NotFoundException>()
+                .WithMessage($"User with ID '{target.Id}' was not found.");
+        }
+
+        [Test]
+        public async Task GetUserTripsAsync_WhenTargetDoesNotExist_ShouldThrowNotFoundException()
+        {
+            // Arrange
+            var requester = await AddUserAsync(isPublic: true);
+            var missingId = Guid.NewGuid();
+
+            // Act & Assert
+            await Assert.That(async () => await _sut.GetUserTripsAsync(new BasicListCommand(), requester.Id, missingId))
+                .Throws<NotFoundException>()
+                .WithMessage($"User with ID '{missingId}' was not found.");
+        }
+
+        [Test]
+        public async Task GetUserTripsAsync_WhenTargetAccountIsDeleted_ShouldThrowNotFoundException()
+        {
+            // Arrange
+            var requester = await AddUserAsync(isPublic: false);
+            var target = await AddUserAsync(isPublic: true);
+            await AddTripAsync(target, Utc(2025, 1, 1));
+
+            _context.Remove(target);
+            await _context.SaveChangesAsync();
+
+            // Act & Assert
+            await Assert.That(async () => await _sut.GetUserTripsAsync(new BasicListCommand(), requester.Id, target.Id))
+                .Throws<NotFoundException>();
         }
         #endregion
 

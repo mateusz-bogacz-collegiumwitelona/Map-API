@@ -95,7 +95,11 @@ namespace Tests.Services
 
             _ctMock = new FakeCancellationTokenAccessor();
 
-            _userServicesMock = new UserServices(_contextMock, _loggerMock, _ctMock);
+            _userServicesMock = new UserServices(
+                _contextMock,
+                _loggerMock,
+                _ctMock,
+                new ResourceAuthorizationService(_contextMock));
         }
 
         [After(Test)]
