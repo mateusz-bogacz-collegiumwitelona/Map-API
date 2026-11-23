@@ -1,3 +1,5 @@
+using Domain.Const;
+
 namespace Api.Configuration
 {
     public static class AuthorizationConfiguration
@@ -9,8 +11,8 @@ namespace Api.Configuration
         {
             services.AddAuthorization(options =>
             {
-                options.AddPolicy(UserPolicy, policy => policy.RequireRole("User"));
-                options.AddPolicy(AdminPolicy, policy => policy.RequireRole("Admin"));
+                options.AddPolicy(UserPolicy, policy => policy.RequireRole(RolesConst.User));
+                options.AddPolicy(AdminPolicy, policy => policy.RequireRole(RolesConst.Admin));
             });
 
             return services;

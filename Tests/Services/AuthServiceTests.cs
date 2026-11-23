@@ -146,8 +146,9 @@ namespace Tests.Services
             var createScript = Context.Database.GenerateCreateScript();
             await Context.Database.ExecuteSqlRawAsync(createScript);
 
-            await CreateRoleAsync("User");
-            await CreateRoleAsync("Admin");
+
+            await CreateRoleAsync(RolesConst.User);
+            await CreateRoleAsync(RolesConst.Admin);
         }
 
         [After(Test)]
@@ -198,7 +199,7 @@ namespace Tests.Services
             var data = result.Data!;
 
             await Assert.That(data.UserId).IsEqualTo(user.Id);
-            await Assert.That(data.Roles).Contains("User");
+            await Assert.That(data.Roles).Contains(RolesConst.User);
             await Assert.That(string.IsNullOrWhiteSpace(data.AccessToken)).IsFalse();
             await Assert.That(data.AccessTokenExpiration).IsGreaterThan(DateTime.UtcNow);
 
@@ -214,8 +215,8 @@ namespace Tests.Services
             await Assert.That(emailClaim).IsNotNull();
             await Assert.That(emailClaim!.Value).IsEqualTo(user.Email);
 
-            var hasUserRole = principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == "User")
-                || principal.FindAll("role").Any(claim => claim.Value == "User");
+            var hasUserRole = principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == RolesConst.User)
+                || principal.FindAll("role").Any(claim => claim.Value == RolesConst.User);
             await Assert.That(hasUserRole).IsTrue();
 
             var storedToken = await Context.RefreshTokens
