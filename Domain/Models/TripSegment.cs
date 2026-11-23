@@ -21,5 +21,12 @@ namespace Domain.Models
         public decimal DistanceKm { get; set; }
         public Geometry Geometry { get; set; } = null!;
         public bool IsFallbackRoute { get; set; } = false;
+
+        public void UpdateRoute(LineString geometry, decimal distanceKm, bool isFallbackRoute)
+        {
+            Geometry = geometry;
+            DistanceKm = distanceKm;
+            IsFallbackRoute = isFallbackRoute;
+        }
     }
 }

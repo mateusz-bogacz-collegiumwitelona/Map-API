@@ -8,7 +8,7 @@
             services.AddSingleton<UserMapper>();
             services.AddSingleton<BanMapper>();
             services.AddSingleton<ListMapper>();
-
+            services.AddSingleton<TripMapper>();
             return services;
         }
     }

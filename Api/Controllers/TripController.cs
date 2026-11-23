@@ -1,3 +1,4 @@
+using Api.Configuration;
 using Api.Controllers.Base;
 using Api.Mappers;
 using Api.Request.List;
@@ -52,6 +53,21 @@ namespace Api.Controllers
             )
         {
             var result = await trips.GetUserTripsAsync(mapper.MapBasicList(request), CurrentUserId);
+            return HandleResult(result);
+        }
+
+        [EndpointSummary("Save the route of a trip segment")]
+        [EndpointDescription("Stores the route calculated on the device for one stage of the current user's trip, together with its distance in kilometers, so trip queries return it directly instead of routing again. Coordinates are points with latitude and longitude ordered from the origin to the destination of the segment, between 2 and 10000 points. Consecutive duplicate points are ignored and at least 2 distinct points must remain. The route must start within 10 km of the segment origin and end within 10 km of its destination. The distance must be between 0.01 and 40075 km, cannot be shorter than the length of the route line and cannot be more than 1.5 times that length. For a fallback route the distance must match the length of the line. Returns 400 when the route or distance is invalid and 404 when the segment does not exist or belongs to another user. Available only for accounts with the User role.")]
+        [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+        [HttpPut("segments/{segmentId:guid}/route")]
+        [Authorize(Policy = AuthorizationConfiguration.UserPolicy)]
+        public async Task<IActionResult> UpdateSegmentRouteAsync(
+            [FromRoute] Guid segmentId,
+            [FromServices] ITripServices trips,
+            [FromServices] TripMapper mapper,
+            [FromBody] UpdateSegmentRouteRequest request)
+        {
+            var result = await trips.UpdateSegmentRouteAsync(CurrentUserId, segmentId, mapper.MapUpdateSegmentRoute(request));
             return HandleResult(result);
         }
     }
