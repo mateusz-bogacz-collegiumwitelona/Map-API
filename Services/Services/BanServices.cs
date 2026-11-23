@@ -388,6 +388,6 @@ namespace Services.Services
             }
         }
 
-        private Task<bool> IsAdminAsync(User user) => _userManager.IsInRoleAsync(user, "Admin");
+        private Task<bool> IsAdminAsync(User user) => _userManager.IsInRoleAsync(user, RolesConst.Admin);
     }
 }
