@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Services.Accessors.Interfaces;
-using Services.Command.User;
+using Services.Command.List;
 using Services.Interfaces;
 using Services.Response.User;
 using Services.Services;
@@ -50,7 +50,7 @@ namespace Tests.Services
             using var conn = new NpgsqlConnection(_connectionString);
             await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS pg_trgm;";
+            cmd.CommandText = "CREATE EXTENSION IF NOT EXISTS unaccent;";
             await cmd.ExecuteNonQueryAsync();
         }
 
@@ -120,7 +120,7 @@ namespace Tests.Services
             await SeedUserAsync("John", "Smith");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "jan" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "jan" });
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -136,7 +136,7 @@ namespace Tests.Services
             await SeedUserAsync("John", "Smith");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "oe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "oe" });
 
             // Assert
             await Assert.That(result.Data!.Items.Count).IsEqualTo(1);
@@ -152,7 +152,7 @@ namespace Tests.Services
             var jane = await SeedUserAsync("Jane", "Doe");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = query });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = query });
 
             // Assert
             await Assert.That(result.Data!.Items.Count).IsEqualTo(1);
@@ -168,7 +168,7 @@ namespace Tests.Services
             await SeedUserAsync("John", "Doe");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "Jane Doe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "Jane Doe" });
 
             // Assert
             await Assert.That(result.Data!.Items.Count).IsEqualTo(1);
@@ -188,12 +188,26 @@ namespace Tests.Services
             await SeedUserAsync("Deleted", "Person", isDeleted: true);
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = query });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = query });
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
             await Assert.That(result.Data!.Items.Count).IsEqualTo(2);
             await Assert.That(result.Data.TotalCount).IsEqualTo(2);
+        }
+
+        [Test]
+        public async Task SearchUsersAsync_WhenQueryOmitsDiacritics_ShouldMatchAccentedName()
+        {
+            // Arrange
+            var user = await SeedUserAsync("Łukasz", "Żółw");
+
+            // Act
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "lukasz zolw" });
+
+            // Assert
+            await Assert.That(result.Data!.Items.Count).IsEqualTo(1);
+            await Assert.That(result.Data.Items[0].UserId).IsEqualTo(user.Id);
         }
         #endregion
 
@@ -205,7 +219,7 @@ namespace Tests.Services
             await SeedUserAsync("Jane", "Doe", isPublic: false);
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "Jane Doe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "Jane Doe" });
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
@@ -220,7 +234,7 @@ namespace Tests.Services
             await SeedUserAsync("Jane", "Doe", isDeleted: true);
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "Jane Doe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "Jane Doe" });
 
             // Assert
             await Assert.That(result.Data!.Items).IsEmpty();
@@ -234,7 +248,7 @@ namespace Tests.Services
             await SeedUserAsync("Jane", "Doe", isBanned: true);
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "Jane Doe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "Jane Doe" });
 
             // Assert
             await Assert.That(result.Data!.Items).IsEmpty();
@@ -248,7 +262,7 @@ namespace Tests.Services
             await SeedUserAsync("Jane", "Doe", isBanned: true, bannedUntil: DateTime.UtcNow.AddDays(7));
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "Jane Doe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "Jane Doe" });
 
             // Assert
             await Assert.That(result.Data!.Items).IsEmpty();
@@ -262,7 +276,7 @@ namespace Tests.Services
             var jane = await SeedUserAsync("Jane", "Doe", isBanned: true, bannedUntil: DateTime.UtcNow.AddDays(-1));
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "Jane Doe" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "Jane Doe" });
 
             // Assert
             await Assert.That(result.Data!.Items.Count).IsEqualTo(1);
@@ -280,7 +294,7 @@ namespace Tests.Services
             await SeedUserAsync("Bravo", "Xray");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { SortBy = "name_asc" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SortBy = "firstname", SortDescending = false });
 
             // Assert
             var names = result.Data!.Items.Select(u => u.FirstName).ToList();
@@ -296,7 +310,7 @@ namespace Tests.Services
             await SeedUserAsync("Bravo", "Xray");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { SortBy = "name_desc" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SortBy = "firstname", SortDescending = true });
 
             // Assert
             var names = result.Data!.Items.Select(u => u.FirstName).ToList();
@@ -311,7 +325,7 @@ namespace Tests.Services
             await SeedUserAsync("Alpha", "Yankee");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand());
+            var result = await _sut.SearchUsersAsync(new BasicListCommand());
 
             // Assert
             var names = result.Data!.Items.Select(u => u.FirstName).ToList();
@@ -319,9 +333,9 @@ namespace Tests.Services
         }
 
         [Test]
-        [Arguments("newest")]
-        [Arguments("oldest")]
-        public async Task SearchUsersAsync_WhenSortingByRegistrationDate_ShouldOrderByCreatedAt(string sort)
+        [Arguments(true)]
+        [Arguments(false)]
+        public async Task SearchUsersAsync_WhenSortingByRegistrationDate_ShouldOrderByCreatedAt(bool sortDescending)
         {
             // Arrange
             var now = DateTime.UtcNow;
@@ -329,12 +343,12 @@ namespace Tests.Services
             var middle = await SeedUserAsync("Alpha", "Yankee", createdAt: now.AddDays(-2));
             var newest = await SeedUserAsync("Bravo", "Xray", createdAt: now.AddDays(-1));
 
-            var expected = sort == "newest"
+            var expected = sortDescending
                 ? new[] { newest.Id, middle.Id, oldest.Id }
                 : new[] { oldest.Id, middle.Id, newest.Id };
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { SortBy = sort });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SortBy = "createdat", SortDescending = sortDescending });
 
             // Assert
             var ids = result.Data!.Items.Select(u => u.UserId).ToList();
@@ -356,8 +370,8 @@ namespace Tests.Services
             await SeedUserAsync("Deleted", "User", isDeleted: true);
 
             // Act
-            var firstPage = await _sut.SearchUsersAsync(new UserSearchCommand { PageNumber = 1, PageSize = 2 });
-            var lastPage = await _sut.SearchUsersAsync(new UserSearchCommand { PageNumber = 3, PageSize = 2 });
+            var firstPage = await _sut.SearchUsersAsync(new BasicListCommand { PageNumber = 1, PageSize = 2 });
+            var lastPage = await _sut.SearchUsersAsync(new BasicListCommand { PageNumber = 3, PageSize = 2 });
 
             // Assert
             await Assert.That(firstPage.Data!.Items.Count).IsEqualTo(2);
@@ -383,7 +397,7 @@ namespace Tests.Services
             }
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { PageNumber = 99, PageSize = 2 });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { PageNumber = 99, PageSize = 2 });
 
             // Assert
             await Assert.That(result.Data!.PageNumber).IsEqualTo(2);
@@ -392,7 +406,7 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task SearchUsersAsync_WhenPageSizeIsNotProvided_ShouldUseDefaultTwenty()
+        public async Task SearchUsersAsync_WhenPageSizeIsNotProvided_ShouldUseDefaultPageSize()
         {
             // Arrange
             for (int i = 1; i <= 25; i++)
@@ -401,11 +415,11 @@ namespace Tests.Services
             }
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand());
+            var result = await _sut.SearchUsersAsync(new BasicListCommand());
 
             // Assert
-            await Assert.That(result.Data!.PageSize).IsEqualTo(20);
-            await Assert.That(result.Data.Items.Count).IsEqualTo(20);
+            await Assert.That(result.Data!.PageSize).IsEqualTo(10);
+            await Assert.That(result.Data.Items.Count).IsEqualTo(10);
             await Assert.That(result.Data.TotalCount).IsEqualTo(25);
         }
 
@@ -416,7 +430,7 @@ namespace Tests.Services
             await SeedUserAsync("Jane", "Doe");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { PageSize = 500 });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { PageSize = 500 });
 
             // Assert
             await Assert.That(result.Data!.PageSize).IsEqualTo(100);
@@ -431,7 +445,7 @@ namespace Tests.Services
             await SeedUserAsync("Jane", "Doe");
 
             // Act
-            var result = await _sut.SearchUsersAsync(new UserSearchCommand { Query = "zzzzzz" });
+            var result = await _sut.SearchUsersAsync(new BasicListCommand { SearchTerm = "zzzzzz" });
 
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();

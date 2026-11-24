@@ -18,29 +18,30 @@ namespace Services.QueryExtension
                     var pattern = $"%{EscapeLike(term)}%";
 
                     query = query.Where(u =>
-                        EF.Functions.ILike(u.FirstName, pattern, LikeEscapeCharacter) ||
-                        EF.Functions.ILike(u.LastName, pattern, LikeEscapeCharacter));
+                        EF.Functions.ILike(EF.Functions.Unaccent(u.FirstName), EF.Functions.Unaccent(pattern), LikeEscapeCharacter) ||
+                        EF.Functions.ILike(EF.Functions.Unaccent(u.LastName), EF.Functions.Unaccent(pattern), LikeEscapeCharacter));
                 }
             }
 
             return query;
         }
 
-        internal static IQueryable<User> ApplySorting(IQueryable<User> query, string? sortBy) =>
-            sortBy?.Trim().ToLowerInvariant() switch
+        internal static IQueryable<User> ApplySorting(
+            this IQueryable<User> query,
+            string? sortBy,
+            bool sortDescending) => sortBy?.Trim().ToLowerInvariant() switch
             {
-                "name_desc" => query
-                    .OrderByDescending(u => u.FirstName)
-                    .ThenByDescending(u => u.LastName)
-                    .ThenByDescending(u => u.Id),
+                "createdat" => sortDescending
+                    ? query.OrderByDescending(u => u.CreatedAt).ThenByDescending(u => u.Id)
+                    : query.OrderBy(u => u.CreatedAt).ThenBy(u => u.Id),
 
-                "newest" => query
-                    .OrderByDescending(u => u.CreatedAt)
-                    .ThenByDescending(u => u.Id),
+                "lastname" => sortDescending
+                    ? query.OrderByDescending(u => u.LastName).ThenByDescending(u => u.FirstName).ThenByDescending(u => u.Id)
+                    : query.OrderBy(u => u.LastName).ThenBy(u => u.FirstName).ThenBy(u => u.Id),
 
-                "oldest" => query
-                    .OrderBy(u => u.CreatedAt)
-                    .ThenBy(u => u.Id),
+                "firstname" => sortDescending
+                    ? query.OrderByDescending(u => u.FirstName).ThenByDescending(u => u.LastName).ThenByDescending(u => u.Id)
+                    : query.OrderBy(u => u.FirstName).ThenBy(u => u.LastName).ThenBy(u => u.Id),
 
                 _ => query
                     .OrderBy(u => u.FirstName)

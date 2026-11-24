@@ -1,5 +1,4 @@
 ﻿using Domain.Common;
-using Domain.Const;
 using Domain.Exceptions;
 using Domain.Models;
 using Infrastructure;
@@ -7,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Services.Accessors.Interfaces;
+using Services.Command.List;
 using Services.Command.User;
 using Services.Helpers;
 using Services.Interfaces;
@@ -139,32 +139,25 @@ namespace Services.Services
         }
 
         public async Task<Result<PagedResult<UserSummaryResponse>>> SearchUsersAsync(
-            UserSearchCommand command,
+            BasicListCommand command,
             CancellationToken ct = default)
         {
             var token = _ctAccessor.ResolveCancellationToken(ct);
-            token.ThrowIfCancellationRequested();
-
             var now = DateTime.UtcNow;
-            int pageNumber = command.PageNumber ?? 1;
-            int pageSize = command.PageSize ?? UserSearchConst.DefaultPageSize;
 
-            var users = _context.Users
+            return await _context.Users
                 .AsNoTracking()
                 .Where(u => u.IsPublic
-                    && !u.IsDeleted
-                    && u.DeletedAt == null
-                    && !(u.IsBanned && (u.BannedUntil == null || u.BannedUntil > now)));
-
-            return await UserQueryExtension
-                .ApplySorting(UserQueryExtension.ApplySearch(users, command.Query), command.SortBy)
+                    && !(u.IsBanned && (u.BannedUntil == null || u.BannedUntil > now)))
+                .ApplySearch(command.SearchTerm)
+                .ApplySorting(command.SortBy, command.SortDescending)
                 .Select(u => new UserSummaryResponse
                 {
                     UserId = u.Id,
                     FirstName = u.FirstName,
                     LastName = u.LastName
                 })
-                .ToPagedResultAsync(pageNumber, pageSize, _logger, "Users", token);
+                .ToPagedResultAsync(command.PageNumber, command.PageSize, _logger, "Users", token);
         }
 
         private async Task<User> GetUserAsync(Guid userId, CancellationToken token)

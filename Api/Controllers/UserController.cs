@@ -2,6 +2,7 @@
 using Api.Controllers.Base;
 using Api.Mappers;
 using Api.Request.Account;
+using Api.Request.List;
 using Api.Request.User;
 using Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -57,16 +58,16 @@ namespace Api.Controllers
         }
 
         [EndpointSummary("Search public user profiles")]
-        [EndpointDescription("Returns a paginated list of active, public user profiles matching the query by first or last name. Matching is case-insensitive and partial; multi-word queries require every word to match either name. Supports sorting by name or registration date and returns summary fields only.")]
+        [EndpointDescription("Returns a paginated list of active, public user profiles matching the search term by first or last name. Matching is case-insensitive and partial; multi-word terms require every word to match either name. Supports sorting by firstName, lastName or createdAt (firstName ascending by default) and returns summary fields only.")]
         [ProducesResponseType(typeof(Result<PagedResult<UserSummaryResponse>>), StatusCodes.Status200OK)]
         [HttpGet("search")]
         [Authorize]
         public async Task<IActionResult> SearchUsersAsync(
-            [FromQuery] UserSearchRequest request,
+            [FromQuery] BasicListRequest request,
             [FromServices] IUserServices user,
-            [FromServices] UserMapper mapper)
+            [FromServices] ListMapper mapper)
         {
-            var result = await user.SearchUsersAsync(mapper.MapUserSearch(request));
+            var result = await user.SearchUsersAsync(mapper.MapBasicList(request));
             return HandleResult(result);
         }
 

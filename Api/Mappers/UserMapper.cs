@@ -17,11 +17,6 @@ namespace Api.Mappers
         [MapProperty(nameof(ChangeEmailRequest.NewEmail), nameof(ChangeEmailCommand.NewEmail), Use = nameof(Trim))]
         public partial ChangeEmailCommand MapChangeEmail(ChangeEmailRequest request);
 
-        [MapProperty(nameof(UserSearchRequest.Q), nameof(UserSearchCommand.Query))]
-        [MapProperty(nameof(UserSearchRequest.Page), nameof(UserSearchCommand.PageNumber))]
-        [MapProperty(nameof(UserSearchRequest.Limit), nameof(UserSearchCommand.PageSize))]
-        public partial UserSearchCommand MapUserSearch(UserSearchRequest request);
-
         public partial ConfirmEmailChangeCommand MapConfirmEmailChange(ConfirmEmailChangeRequest request);
     }
 }
