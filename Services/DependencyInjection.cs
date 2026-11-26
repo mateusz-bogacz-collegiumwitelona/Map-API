@@ -26,8 +26,8 @@ namespace Services
             services.AddScoped<IUserServices, UserServices>();
             services.AddScoped<IAccountServices, AccountServices>();
             services.AddScoped<ITripServices, TripServices>();
+            services.AddScoped<IPlaceServices, PlaceServices>();
             services.AddScoped<IBanServices, BanServices>();
-
             return services;
         }
     }

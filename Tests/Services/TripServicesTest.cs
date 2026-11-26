@@ -16,6 +16,8 @@ using Services.Services;
 using System.Text.Json;
 using Testcontainers.PostgreSql;
 using Tests.Fakes;
+using Services.Command.Trip;
+using Services.Command.Place;
 
 namespace Tests.Services
 {
@@ -32,6 +34,7 @@ namespace Tests.Services
         private Country _italy = null!;
         private Place _krakow = null!;
         private Place _rome = null!;
+        private Place _warsaw = null!;
 
         [Before(Class)]
         public static async Task SetupClassAsync()
@@ -97,10 +100,11 @@ namespace Tests.Services
             _poland = CreateCountry("Poland", "PL");
             _italy = CreateCountry("Italy", "IT");
 
-            _krakow = CreatePlace("Krakow", _poland, 19.94, 50.06);
-            _rome = CreatePlace("Rome", _italy, 12.49, 41.90);
+            _krakow = CreatePlace("Kraków", _poland, 19.94, 50.06);
+            _rome = CreatePlace("Rzym", _italy, 12.49, 41.90);
+            _warsaw = CreatePlace("Warszawa", _poland, 21.01, 52.23);
 
-            _context.Places.AddRange(_krakow, _rome);
+            _context.Places.AddRange(_krakow, _rome, _warsaw);
             await _context.SaveChangesAsync();
 
             _sut = new TripServices(
@@ -237,8 +241,21 @@ namespace Tests.Services
                 { SRID = GeoConst.SRID }
             };
 
-        private static Place CreatePlace(string name, Country country, double longitude, double latitude)
-            => new Place { Name = name, Country = country, Location = new Point(longitude, latitude) { SRID = GeoConst.SRID } };
+        private static Place CreatePlace(
+            string name,
+            Country country,
+            double longitude,
+            double latitude)
+            => new Place
+            {
+                Name = name,
+                Country = country,
+                IsCatalogPlace = true,
+                Location = new Point(longitude, latitude)
+                {
+                    SRID = GeoConst.SRID
+                }
+            };
 
         private static DateTime Utc(int year, int month, int day, int hour = 0, int minute = 0)
             => new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Utc);
@@ -274,8 +291,8 @@ namespace Tests.Services
             await Assert.That(segment.TransportType).IsEqualTo(TransportTypeEnum.Plane);
             await Assert.That(segment.DistanceKm).IsEqualTo(1096.50m);
             await Assert.That(segment.IsFallbackRoute).IsTrue();
-            await Assert.That(segment.OriginName).IsEqualTo("Krakow");
-            await Assert.That(segment.DestinationName).IsEqualTo("Rome");
+            await Assert.That(segment.OriginName).IsEqualTo("Kraków");
+            await Assert.That(segment.DestinationName).IsEqualTo("Rzym");
         }
 
         [Test]
@@ -582,10 +599,14 @@ namespace Tests.Services
             var target = await AddUserAsync(isPublic: false);
             await AddTripAsync(target, Utc(2025, 1, 1));
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetTripRoutesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{target.Id}' was not found.");
+            // Act
+            var result = await _sut.GetTripRoutesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -595,10 +616,14 @@ namespace Tests.Services
             var requester = await AddUserAsync();
             var targetId = Guid.NewGuid();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetTripRoutesAsync(requester.Id, targetId))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{targetId}' was not found.");
+            // Act
+            var result = await _sut.GetTripRoutesAsync(requester.Id, targetId);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -612,9 +637,14 @@ namespace Tests.Services
             _context.Remove(target);
             await _context.SaveChangesAsync();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetTripRoutesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>();
+            // Act
+            var result = await _sut.GetTripRoutesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
         #endregion
 
@@ -884,12 +914,12 @@ namespace Tests.Services
 
             var italy = countries[0];
             await Assert.That(italy.CountryName).IsEqualTo("Italy");
-            await Assert.That(italy.PlaceNames.SequenceEqual(new[] { "Rome" })).IsTrue();
+            await Assert.That(italy.PlaceNames.SequenceEqual(new[] { "Rzym" })).IsTrue();
             await Assert.That(italy.Trips.Single().TripId).IsEqualTo(trip.Id);
             await Assert.That(italy.Trips.Single().Title).IsEqualTo("Italy trip");
             await Assert.That(italy.Trips.Single().StartDate).IsEqualTo(Utc(2025, 5, 1));
 
-            await Assert.That(countries[1].PlaceNames.SequenceEqual(new[] { "Krakow" })).IsTrue();
+            await Assert.That(countries[1].PlaceNames.SequenceEqual(new[] { "Kraków" })).IsTrue();
         }
 
         [Test]
@@ -897,7 +927,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
+            var warsaw = await AddPlaceAsync("Warszawa", _poland);
             var older = await AddTripAsync(user, Utc(2023, 1, 1), "Older");
             var newer = await AddTripAsync(user, Utc(2025, 1, 1), "Newer");
             await AddSegmentAsync(older, 0, origin: warsaw, destination: _krakow);
@@ -911,7 +941,7 @@ namespace Tests.Services
 
             // Assert
             var poland = result.Data!.Single();
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Krakow", "Warsaw" })).IsTrue();
+            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Kraków", "Warszawa" })).IsTrue();
             await Assert.That(poland.Trips.Select(t => t.TripId).SequenceEqual(new[] { newer.Id, older.Id })).IsTrue();
         }
 
@@ -920,7 +950,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
+            var warsaw = await AddPlaceAsync("Warszawa", _poland);
             var trip2024 = await AddTripAsync(user, Utc(2024, 12, 31, 23, 59));
             var trip2025 = await AddTripAsync(user, Utc(2025, 1, 1));
             await AddSegmentAsync(trip2024, 0);
@@ -935,7 +965,7 @@ namespace Tests.Services
             // Assert
             var poland = result.Data!.Single();
             await Assert.That(poland.CountryCode).IsEqualTo("PL");
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Warsaw" })).IsTrue();
+            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Warszawa" })).IsTrue();
             await Assert.That(poland.Trips.Single().TripId).IsEqualTo(trip2025.Id);
         }
 
@@ -990,7 +1020,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
+            var warsaw = await AddPlaceAsync("Warszawa", _poland);
             var deletedTrip = await AddTripAsync(user, Utc(2025, 1, 1));
             var activeTrip = await AddTripAsync(user, Utc(2024, 1, 1));
             await AddSegmentAsync(deletedTrip, 0);
@@ -1010,7 +1040,7 @@ namespace Tests.Services
             // Assert
             var poland = result.Data!.Single();
             await Assert.That(poland.CountryCode).IsEqualTo("PL");
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Krakow" })).IsTrue();
+            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Kraków" })).IsTrue();
             await Assert.That(poland.Trips.Single().TripId).IsEqualTo(activeTrip.Id);
         }
 
@@ -1054,10 +1084,14 @@ namespace Tests.Services
             var trip = await AddTripAsync(target, Utc(2025, 1, 1));
             await AddVisitAsync(trip, _poland);
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{target.Id}' was not found.");
+            // Act
+            var result = await _sut.GetVisitedCountriesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -1067,10 +1101,14 @@ namespace Tests.Services
             var requester = await AddUserAsync();
             var targetId = Guid.NewGuid();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, targetId))
-                .Throws<NotFoundException>()
-                .WithMessage($"User with ID '{targetId}' was not found.");
+            // Act
+            var result = await _sut.GetVisitedCountriesAsync(requester.Id, targetId);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
         }
 
         [Test]
@@ -1085,9 +1123,687 @@ namespace Tests.Services
             _context.Remove(target);
             await _context.SaveChangesAsync();
 
-            // Act & Assert
-            await Assert.That(async () => await _sut.GetVisitedCountriesAsync(requester.Id, target.Id))
-                .Throws<NotFoundException>();
+            // Act
+            var result = await _sut.GetVisitedCountriesAsync(requester.Id, target.Id);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.NotFound);
+            await Assert.That(result.Message).IsEqualTo("User was not found.");
+        }
+        #endregion
+
+        #region Trip management
+        private ITripServices CreateManagementService()
+        {
+            return new TripServices(
+                _context,
+                new LoggerFactory().CreateLogger<TripServices>(),
+                new FakeCancellationTokenAccessor());
+        }
+
+        private async Task SetDistinctCountryBoundariesAsync()
+        {
+            _poland.Boundary = CreateCountryBoundary(15, 45, 25, 55);
+            _italy.Boundary = CreateCountryBoundary(5, 35, 20, 48);
+
+            await _context.SaveChangesAsync();
+        }
+
+        private static MultiPolygon CreateCountryBoundary(
+            double minLongitude,
+            double minLatitude,
+            double maxLongitude,
+            double maxLatitude)
+        {
+            var ring = new LinearRing(new[]
+            {
+                new Coordinate(minLongitude, minLatitude),
+                new Coordinate(minLongitude, maxLatitude),
+                new Coordinate(maxLongitude, maxLatitude),
+                new Coordinate(maxLongitude, minLatitude),
+                new Coordinate(minLongitude, minLatitude)
+            });
+
+            return new MultiPolygon(new[] { new Polygon(ring) })
+            {
+                SRID = GeoConst.SRID
+            };
+        }
+
+        private TripPointCommand CreateTripPoint(
+            string name,
+            double latitude,
+            double longitude)
+        {
+            var placeId = name switch
+            {
+                "Kraków" or "Krakow" => _krakow.Id,
+                "Rzym" or "Rome" => _rome.Id,
+                "Warszawa" => _warsaw.Id,
+                _ => Guid.NewGuid()
+            };
+
+            return new TripPointCommand
+            {
+                PlaceId = placeId
+            };
+        }
+
+        private static TripSegmentCommand CreateTripSegment(
+            TripPointCommand origin,
+            TripPointCommand destination,
+            TransportTypeEnum transportType = TransportTypeEnum.Car)
+        {
+            return new TripSegmentCommand
+            {
+                Origin = origin,
+                Destination = destination,
+                TransportType = transportType
+            };
+        }
+
+        private static UpsertTripCommand CreateUpsertTripCommand(
+        string title,
+        string? description,
+        DateTime startDate,
+        DateTime? endDate,
+        IReadOnlyList<TripSegmentCommand> segments)
+        {
+            return new UpsertTripCommand
+            {
+                Title = title,
+                Description = description,
+                StartDate = startDate,
+                EndDate = endDate,
+                Segments = segments
+            };
+        }
+
+        [Test]
+        public async Task CreateTripAsync_ShouldPersistSegmentsInOrderAndCreateVisitedCountries()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var command = CreateUpsertTripCommand(
+                "Podróż",
+                "Opis",
+                Utc(2025, 6, 1),
+                null,
+                new[]
+                {
+                    CreateTripSegment(
+                        CreateTripPoint("Kraków", 50.0647, 19.945),
+                        CreateTripPoint("Rzym", 41.9028, 12.4964),
+                        TransportTypeEnum.Train),
+                    CreateTripSegment(
+                        CreateTripPoint("Rzym", 41.9028, 12.4964),
+                        CreateTripPoint("Kraków", 50.0647, 19.945),
+                        TransportTypeEnum.Car)
+                });
+
+            var service = CreateManagementService();
+
+            // Act
+            var result = await service.CreateTripAsync(user.Id, command);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status201Created);
+            await Assert.That(result.Data!.Segments.Count).IsEqualTo(2);
+            await Assert.That(result.Data.Segments[0].OrderIndex).IsEqualTo(0);
+            await Assert.That(result.Data.Segments[1].OrderIndex).IsEqualTo(1);
+            await Assert.That(result.Data.Segments[0].TransportType)
+                .IsEqualTo(TransportTypeEnum.Train);
+
+            var segments = await _context.TripSegments
+                .AsNoTracking()
+                .Where(segment => segment.TripId == result.Data.Id)
+                .OrderBy(segment => segment.OrderIndex)
+                .ToListAsync();
+
+            await Assert.That(segments.Count).IsEqualTo(2);
+            var placesCount = await _context.Places.CountAsync();
+            await Assert.That(placesCount).IsEqualTo(3);
+            await Assert.That(segments[0].Geometry.Coordinates.Length).IsEqualTo(2);
+            await Assert.That(segments[0].Geometry.SRID).IsEqualTo(GeoConst.SRID);
+            await Assert.That(segments[0].DistanceKm).IsGreaterThan(0m);
+
+            var visits = await _context.VisitedCountries
+                .AsNoTracking()
+                .Where(visit => visit.TripId == result.Data.Id)
+                .ToListAsync();
+
+            await Assert.That(visits.Count).IsEqualTo(2);
+        }
+
+        [Test]
+        public async Task GetTripDetailsAsync_ShouldReturnOrderedTripDetails()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var trip = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Podróż",
+                    "Opis",
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                        CreateTripSegment(
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            CreateTripPoint("Rzym", 41.9028, 12.4964),
+                            TransportTypeEnum.Train),
+                        CreateTripSegment(
+                            CreateTripPoint("Rzym", 41.9028, 12.4964),
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            TransportTypeEnum.Car)
+                    }));
+
+            // Act
+            var result = await service.GetTripDetailsAsync(user.Id, trip.Data!.Id);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.Title).IsEqualTo("Podróż");
+            await Assert.That(result.Data.Description).IsEqualTo("Opis");
+            await Assert.That(result.Data.Segments.Count).IsEqualTo(2);
+            await Assert.That(result.Data.Segments[0].OrderIndex).IsEqualTo(0);
+            await Assert.That(result.Data.Segments[0].Origin.Name).IsEqualTo("Kraków");
+            await Assert.That(result.Data.Segments[0].Destination.Name).IsEqualTo("Rzym");
+            await Assert.That(result.Data.Segments[1].OrderIndex).IsEqualTo(1);
+        }
+
+        [Test]
+        public async Task UpdateTripAsync_ShouldSoftDeletePreviousSegmentsAndSynchronizeVisitedCountries()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var created = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Stara nazwa",
+                    null,
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                        CreateTripSegment(
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            CreateTripPoint("Rzym", 41.9028, 12.4964))
+                    }));
+
+            var command = CreateUpsertTripCommand(
+                "Nowa nazwa",
+                "Zaktualizowany opis",
+                Utc(2026, 7, 1),
+                Utc(2026, 7, 10),
+                new[]
+                {
+                    CreateTripSegment(
+                        CreateTripPoint("Kraków", 50.0647, 19.945),
+                        CreateTripPoint("Warszawa", 52.2297, 21.0122))
+                });
+
+            // Act
+            var result = await service.UpdateTripAsync(
+                user.Id,
+                created.Data!.Id,
+                command);
+
+            // Assert
+            await Assert.That(result.Data!.Title).IsEqualTo("Nowa nazwa");
+            await Assert.That(result.Data.StartDate).IsEqualTo(Utc(2026, 7, 1));
+            await Assert.That(result.Data.EndDate).IsEqualTo(Utc(2026, 7, 10));
+
+            var segments = await _context.TripSegments
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(segment => segment.TripId == created.Data.Id)
+                .ToListAsync();
+
+            await Assert.That(segments.Count).IsEqualTo(2);
+            await Assert.That(segments.Count(segment => segment.IsDeleted)).IsEqualTo(1);
+
+            var visits = await _context.VisitedCountries
+                .AsNoTracking()
+                .Where(visit => visit.TripId == created.Data.Id)
+                .ToListAsync();
+
+            await Assert.That(visits.Count).IsEqualTo(1);
+            await Assert.That(visits[0].CountryId).IsEqualTo(_poland.Id);
+            await Assert.That(visits[0].Year).IsEqualTo(2026);
+        }
+
+        [Test]
+        public async Task DeleteTripAsync_ShouldSoftDeleteTripAndSegmentsAndRemoveOnlyItsVisits()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var tripToDelete = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Do usunięcia",
+                    null,
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                        CreateTripSegment(
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            CreateTripPoint("Rzym", 41.9028, 12.4964))
+                    }));
+
+            var remainingTrip = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Pozostaje",
+                    null,
+                    Utc(2025, 8, 1),
+                    null,
+                    new[]
+                    {
+                        CreateTripSegment(
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            CreateTripPoint("Warszawa", 52.2297, 21.0122))
+                    }));
+
+            // Act
+            var result = await service.DeleteTripAsync(user.Id, tripToDelete.Data!.Id);
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+
+            var deletedTrip = await _context.Trips
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(trip => trip.Id == tripToDelete.Data.Id);
+
+            await Assert.That(deletedTrip.IsDeleted).IsTrue();
+
+            var deletedSegments = await _context.TripSegments
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(segment => segment.TripId == tripToDelete.Data.Id)
+                .ToListAsync();
+
+            await Assert.That(deletedSegments.All(segment => segment.IsDeleted)).IsTrue();
+
+            var deletedTripVisits = await _context.VisitedCountries
+                .AsNoTracking()
+                .Where(visit => visit.TripId == tripToDelete.Data.Id)
+                .ToListAsync();
+
+            await Assert.That(deletedTripVisits).IsEmpty();
+
+            var remainingVisits = await _context.VisitedCountries
+                .AsNoTracking()
+                .Where(visit => visit.UserId == user.Id)
+                .ToListAsync();
+
+            await Assert.That(remainingVisits.Count).IsEqualTo(1);
+            await Assert.That(remainingVisits[0].TripId)
+                .IsEqualTo(remainingTrip.Data!.Id);
+            await Assert.That(remainingVisits[0].CountryId).IsEqualTo(_poland.Id);
+        }
+
+        [Test]
+        public async Task TripManagementAsync_WhenUserDoesNotOwnTrip_ShouldReturnNotFoundResults()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var owner = await AddUserAsync();
+            var otherUser = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var trip = await service.CreateTripAsync(
+                owner.Id,
+                CreateUpsertTripCommand(
+                    "Prywatna podróż",
+                    null,
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                        CreateTripSegment(
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            CreateTripPoint("Rzym", 41.9028, 12.4964))
+                    }));
+
+            var tripId = trip.Data!.Id;
+
+            var updateCommand = CreateUpsertTripCommand(
+                "Zmiana",
+                null,
+                Utc(2025, 6, 1),
+                null,
+                new[]
+                {
+                    CreateTripSegment(
+                        CreateTripPoint("Kraków", 50.0647, 19.945),
+                        CreateTripPoint("Warszawa", 52.2297, 21.0122))
+                });
+
+            // Act
+            var updateResult = await service.UpdateTripAsync(
+                otherUser.Id,
+                tripId,
+                updateCommand);
+
+            var detailsResult = await service.GetTripDetailsAsync(
+                otherUser.Id,
+                tripId);
+
+            var deleteResult = await service.DeleteTripAsync(
+                otherUser.Id,
+                tripId);
+
+            // Assert
+            await Assert.That(updateResult.IsSuccess).IsFalse();
+            await Assert.That(updateResult.StatusCode)
+                .IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(updateResult.ErrorCode)
+                .IsEqualTo(ErrorCodes.NotFound);
+
+            await Assert.That(detailsResult.IsSuccess).IsFalse();
+            await Assert.That(detailsResult.StatusCode)
+                .IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(detailsResult.ErrorCode)
+                .IsEqualTo(ErrorCodes.NotFound);
+
+            await Assert.That(deleteResult.IsSuccess).IsFalse();
+            await Assert.That(deleteResult.StatusCode)
+                .IsEqualTo(StatusCodes.Status404NotFound);
+            await Assert.That(deleteResult.ErrorCode)
+                .IsEqualTo(ErrorCodes.NotFound);
+
+            var storedTrip = await _context.Trips
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == tripId);
+
+            await Assert.That(storedTrip.Title).IsEqualTo("Prywatna podróż");
+            await Assert.That(storedTrip.IsDeleted).IsFalse();
+        }
+
+        [Test]
+        public async Task CreateTripAsync_WhenPointHasNoCountry_ShouldReturnFailureAndRollbackAllWrites()
+        {
+            // Arrange
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var command = CreateUpsertTripCommand(
+                "Niepoprawny punkt",
+                null,
+                Utc(2025, 6, 1),
+                null,
+                new[]
+                {
+                    CreateTripSegment(
+                        CreateTripPoint("Punkt w kraju", 0.75, 0.25),
+                        CreateTripPoint("Punkt poza krajami", 10, 10))
+                });
+
+            // Act
+            var result = await service.CreateTripAsync(user.Id, command);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode)
+                .IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode)
+                .IsEqualTo(ErrorCodes.TripPointInvalid);
+
+            var trips = await _context.Trips
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(trip => trip.UserId == user.Id)
+                .ToListAsync();
+
+            var segments = await _context.TripSegments
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .ToListAsync();
+
+            var places = await _context.Places
+                .AsNoTracking()
+                .ToListAsync();
+
+            var visits = await _context.VisitedCountries
+                .AsNoTracking()
+                .ToListAsync();
+
+            await Assert.That(trips).IsEmpty();
+            await Assert.That(segments).IsEmpty();
+            await Assert.That(places.Count).IsEqualTo(3);
+            await Assert.That(visits).IsEmpty();
+        }
+
+        [Test]
+        public async Task UpdateTripAsync_WhenPointHasNoCountry_ShouldReturnFailureAndRollbackPreviousChanges()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var trip = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Nazwa przed zmianą",
+                    null,
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                        CreateTripSegment(
+                            CreateTripPoint("Kraków", 50.0647, 19.945),
+                            CreateTripPoint("Rzym", 41.9028, 12.4964))
+                    }));
+
+            var tripId = trip.Data!.Id;
+
+            var updateCommand = CreateUpsertTripCommand(
+                "Nazwa po zmianie",
+                null,
+                Utc(2026, 6, 1),
+                null,
+                new[]
+                {
+                    CreateTripSegment(
+                        CreateTripPoint("Kraków", 50.0647, 19.945),
+                        CreateTripPoint("Punkt poza krajami", 10, 10))
+                });
+
+            // Act
+            var result = await service.UpdateTripAsync(
+                user.Id,
+                tripId,
+                updateCommand);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode)
+                .IsEqualTo(StatusCodes.Status400BadRequest);
+            await Assert.That(result.ErrorCode)
+                .IsEqualTo(ErrorCodes.TripPointInvalid);
+
+            var storedTrip = await _context.Trips
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .SingleAsync(item => item.Id == tripId);
+
+            var activeSegments = await _context.TripSegments
+                .AsNoTracking()
+                .Where(segment => segment.TripId == tripId)
+                .ToListAsync();
+
+            var visits = await _context.VisitedCountries
+                .AsNoTracking()
+                .Where(visit => visit.TripId == tripId)
+                .ToListAsync();
+
+            await Assert.That(storedTrip.Title).IsEqualTo("Nazwa przed zmianą");
+            await Assert.That(storedTrip.IsDeleted).IsFalse();
+            await Assert.That(activeSegments.Count).IsEqualTo(1);
+            await Assert.That(visits.Count).IsEqualTo(2);
+        }
+
+        [Test]
+        public async Task UpdateTripAsync_WhenSegmentIsUnchanged_ShouldPreserveIdAndSavedRoute()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var created = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Pierwotna nazwa",
+                    null,
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                CreateTripSegment(
+                    CreateTripPoint("Kraków", 50.0647, 19.945),
+                    CreateTripPoint("Rzym", 41.9028, 12.4964),
+                    TransportTypeEnum.Train)
+                    }));
+
+            var segmentId = created.Data!.Segments.Single().SegmentId;
+
+            var savedRoute = new LineString(
+                new[]
+                {
+            _krakow.Location.Coordinate,
+            new Coordinate(16.00, 48.00),
+            _rome.Location.Coordinate
+                })
+            {
+                SRID = GeoConst.SRID
+            };
+
+            var storedSegment = await _context.TripSegments
+                .SingleAsync(segment => segment.Id == segmentId);
+
+            storedSegment.Geometry = savedRoute;
+            storedSegment.DistanceKm = 987.65m;
+            storedSegment.IsFallbackRoute = false;
+
+            await _context.SaveChangesAsync();
+
+            var updateCommand = CreateUpsertTripCommand(
+                "Zmieniona nazwa",
+                null,
+                Utc(2025, 6, 1),
+                null,
+                new[]
+                {
+            CreateTripSegment(
+                CreateTripPoint("Kraków", 50.0647, 19.945),
+                CreateTripPoint("Rzym", 41.9028, 12.4964),
+                TransportTypeEnum.Train)
+                });
+
+            // Act
+            var result = await service.UpdateTripAsync(
+                user.Id,
+                created.Data.Id,
+                updateCommand);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.Data!.Segments.Single().SegmentId)
+                .IsEqualTo(segmentId);
+
+            var updatedSegment = await _context.TripSegments
+                .AsNoTracking()
+                .SingleAsync(segment => segment.Id == segmentId);
+
+            await Assert.That(updatedSegment.Geometry.Coordinates.Length)
+                .IsEqualTo(3);
+            await Assert.That(updatedSegment.DistanceKm).IsEqualTo(987.65m);
+            await Assert.That(updatedSegment.IsFallbackRoute).IsFalse();
+        }
+
+        [Test]
+        public async Task SearchPlacesAsync_ShouldReturnCatalogPlaceForAccentlessQueryAndIgnoreWildcards()
+        {
+            // Arrange
+            var privatePlace = new Place
+            {
+                Name = "Kraków prywatne",
+                CountryId = _poland.Id,
+                IsCatalogPlace = false,
+                Location = new Point(19.95, 50.07)
+                {
+                    SRID = GeoConst.SRID
+                }
+            };
+
+            _context.Places.Add(privatePlace);
+            await _context.SaveChangesAsync();
+
+            var service = new PlaceServices(
+                _context,
+                new LoggerFactory().CreateLogger<PlaceServices>(),
+                new FakeCancellationTokenAccessor());
+
+            // Act
+            var accentlessResult = await service.SearchPlacesAsync(
+                new PlaceSearchCommand { Query = "Krakow" });
+
+            var wildcardResult = await service.SearchPlacesAsync(
+                new PlaceSearchCommand { Query = "%%" });
+
+            // Assert
+            await Assert.That(accentlessResult.Data!.Count).IsEqualTo(1);
+            await Assert.That(accentlessResult.Data[0].Id).IsEqualTo(_krakow.Id);
+            await Assert.That(wildcardResult.Data).IsEmpty();
+        }
+        #endregion
+
+        #region Place search
+        [Test]
+        public async Task SearchPlacesAsync_WhenQueryMatchesPlaceName_ShouldReturnPlaceDetails()
+        {
+            // Arrange
+            var service = new PlaceServices(
+                _context,
+                new LoggerFactory().CreateLogger<PlaceServices>(),
+                new FakeCancellationTokenAccessor());
+
+            // Act
+            var result = await service.SearchPlacesAsync(new PlaceSearchCommand { Query = "Kra" });
+
+            // Assert
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data!.Count).IsEqualTo(1);
+            await Assert.That(result.Data[0].Name).IsEqualTo("Kraków");
+            await Assert.That(result.Data[0].CountryName).IsEqualTo("Poland");
+            await Assert.That(result.Data[0].CountryCode).IsEqualTo("PL");
+            await Assert.That(result.Data[0].Latitude).IsEqualTo(50.06);
+            await Assert.That(result.Data[0].Longitude).IsEqualTo(19.94);
         }
         #endregion
     }

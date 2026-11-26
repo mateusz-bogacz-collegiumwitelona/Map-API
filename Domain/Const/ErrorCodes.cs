@@ -42,6 +42,12 @@
 
         #region Trip
         public const string YearInvalid = "TRIP_001";
+        public const string TripTitleInvalid = "TRIP_002";
+        public const string TripDescriptionInvalid = "TRIP_003";
+        public const string TripDateRangeInvalid = "TRIP_004";
+        public const string TripSegmentsInvalid = "TRIP_005";
+        public const string TripPointInvalid = "TRIP_006";
+        public const string TripTransportTypeInvalid = "TRIP_007";
         public const string RouteInvalid = "TRIP_008";
         public const string DistanceInvalid = "TRIP_009";
         public const string RouteEndpointsMismatch = "TRIP_010";
@@ -51,6 +57,10 @@
         public const string CodeInvalid = "VER_001";
         public const string CodeExpired = "VER_002";
         public const string AttemptsExceeded = "VER_003";
+        #endregion
+
+        #region Place
+        public const string PlaceSearchQueryInvalid = "PLACE_001";
         #endregion
 
         #region Ban / Report

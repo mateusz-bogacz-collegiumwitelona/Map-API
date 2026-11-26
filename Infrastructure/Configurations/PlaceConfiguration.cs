@@ -11,6 +11,10 @@ namespace Infrastructure.Configurations
             builder.HasKey(p => p.Id);
             builder.Property(p => p.Name).HasMaxLength(255).IsRequired();
 
+            builder.Property(p => p.IsCatalogPlace)
+                .HasDefaultValue(false)
+                .IsRequired();
+
             builder.Property(p => p.Location)
                 .HasColumnType("geometry(Point, 4326)")
                 .IsRequired();

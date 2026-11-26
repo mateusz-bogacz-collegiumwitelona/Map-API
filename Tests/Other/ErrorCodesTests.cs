@@ -50,6 +50,14 @@ namespace Tests.Other
 
             #region Trip
             await Assert.That(ErrorCodes.YearInvalid).IsEqualTo("TRIP_001");
+            await Assert.That(ErrorCodes.TripTitleInvalid).IsEqualTo("TRIP_002");
+            await Assert.That(ErrorCodes.TripDescriptionInvalid).IsEqualTo("TRIP_003");
+            await Assert.That(ErrorCodes.TripDateRangeInvalid).IsEqualTo("TRIP_004");
+            await Assert.That(ErrorCodes.TripSegmentsInvalid).IsEqualTo("TRIP_005");
+            await Assert.That(ErrorCodes.TripPointInvalid).IsEqualTo("TRIP_006");
+            await Assert.That(ErrorCodes.TripTransportTypeInvalid).IsEqualTo("TRIP_007");
+
+            await Assert.That(ErrorCodes.PlaceSearchQueryInvalid).IsEqualTo("PLACE_001");
             await Assert.That(ErrorCodes.RouteInvalid).IsEqualTo("TRIP_008");
             await Assert.That(ErrorCodes.DistanceInvalid).IsEqualTo("TRIP_009");
             await Assert.That(ErrorCodes.RouteEndpointsMismatch).IsEqualTo("TRIP_010");
@@ -103,6 +111,13 @@ namespace Tests.Other
                 ErrorCodes.FirstNameInvalid,
                 ErrorCodes.LastNameInvalid,
                 ErrorCodes.BioInvalid,
+                ErrorCodes.TripTitleInvalid,
+                ErrorCodes.TripDescriptionInvalid,
+                ErrorCodes.TripDateRangeInvalid,
+                ErrorCodes.TripSegmentsInvalid,
+                ErrorCodes.TripPointInvalid,
+                ErrorCodes.TripTransportTypeInvalid,
+                ErrorCodes.PlaceSearchQueryInvalid,
                 ErrorCodes.EmailInvalid,
                 ErrorCodes.EmailTaken,
                 ErrorCodes.EmailUnchanged,
