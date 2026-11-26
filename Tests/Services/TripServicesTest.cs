@@ -17,6 +17,7 @@ using System.Text.Json;
 using Testcontainers.PostgreSql;
 using Tests.Fakes;
 using Services.Command.Trip;
+using Services.Command.Place;
 
 namespace Tests.Services
 {
@@ -33,6 +34,7 @@ namespace Tests.Services
         private Country _italy = null!;
         private Place _krakow = null!;
         private Place _rome = null!;
+        private Place _warsaw = null!;
 
         [Before(Class)]
         public static async Task SetupClassAsync()
@@ -98,10 +100,11 @@ namespace Tests.Services
             _poland = CreateCountry("Poland", "PL");
             _italy = CreateCountry("Italy", "IT");
 
-            _krakow = CreatePlace("Krakow", _poland, 19.94, 50.06);
-            _rome = CreatePlace("Rome", _italy, 12.49, 41.90);
+            _krakow = CreatePlace("Kraków", _poland, 19.94, 50.06);
+            _rome = CreatePlace("Rzym", _italy, 12.49, 41.90);
+            _warsaw = CreatePlace("Warszawa", _poland, 21.01, 52.23);
 
-            _context.Places.AddRange(_krakow, _rome);
+            _context.Places.AddRange(_krakow, _rome, _warsaw);
             await _context.SaveChangesAsync();
 
             _sut = new TripServices(
@@ -238,8 +241,21 @@ namespace Tests.Services
                 { SRID = GeoConst.SRID }
             };
 
-        private static Place CreatePlace(string name, Country country, double longitude, double latitude)
-            => new Place { Name = name, Country = country, Location = new Point(longitude, latitude) { SRID = GeoConst.SRID } };
+        private static Place CreatePlace(
+            string name,
+            Country country,
+            double longitude,
+            double latitude)
+            => new Place
+            {
+                Name = name,
+                Country = country,
+                IsCatalogPlace = true,
+                Location = new Point(longitude, latitude)
+                {
+                    SRID = GeoConst.SRID
+                }
+            };
 
         private static DateTime Utc(int year, int month, int day, int hour = 0, int minute = 0)
             => new DateTime(year, month, day, hour, minute, 0, DateTimeKind.Utc);
@@ -275,8 +291,8 @@ namespace Tests.Services
             await Assert.That(segment.TransportType).IsEqualTo(TransportTypeEnum.Plane);
             await Assert.That(segment.DistanceKm).IsEqualTo(1096.50m);
             await Assert.That(segment.IsFallbackRoute).IsTrue();
-            await Assert.That(segment.OriginName).IsEqualTo("Krakow");
-            await Assert.That(segment.DestinationName).IsEqualTo("Rome");
+            await Assert.That(segment.OriginName).IsEqualTo("Kraków");
+            await Assert.That(segment.DestinationName).IsEqualTo("Rzym");
         }
 
         [Test]
@@ -898,12 +914,12 @@ namespace Tests.Services
 
             var italy = countries[0];
             await Assert.That(italy.CountryName).IsEqualTo("Italy");
-            await Assert.That(italy.PlaceNames.SequenceEqual(new[] { "Rome" })).IsTrue();
+            await Assert.That(italy.PlaceNames.SequenceEqual(new[] { "Rzym" })).IsTrue();
             await Assert.That(italy.Trips.Single().TripId).IsEqualTo(trip.Id);
             await Assert.That(italy.Trips.Single().Title).IsEqualTo("Italy trip");
             await Assert.That(italy.Trips.Single().StartDate).IsEqualTo(Utc(2025, 5, 1));
 
-            await Assert.That(countries[1].PlaceNames.SequenceEqual(new[] { "Krakow" })).IsTrue();
+            await Assert.That(countries[1].PlaceNames.SequenceEqual(new[] { "Kraków" })).IsTrue();
         }
 
         [Test]
@@ -911,7 +927,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
+            var warsaw = await AddPlaceAsync("Warszawa", _poland);
             var older = await AddTripAsync(user, Utc(2023, 1, 1), "Older");
             var newer = await AddTripAsync(user, Utc(2025, 1, 1), "Newer");
             await AddSegmentAsync(older, 0, origin: warsaw, destination: _krakow);
@@ -925,7 +941,7 @@ namespace Tests.Services
 
             // Assert
             var poland = result.Data!.Single();
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Krakow", "Warsaw" })).IsTrue();
+            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Kraków", "Warszawa" })).IsTrue();
             await Assert.That(poland.Trips.Select(t => t.TripId).SequenceEqual(new[] { newer.Id, older.Id })).IsTrue();
         }
 
@@ -934,7 +950,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
+            var warsaw = await AddPlaceAsync("Warszawa", _poland);
             var trip2024 = await AddTripAsync(user, Utc(2024, 12, 31, 23, 59));
             var trip2025 = await AddTripAsync(user, Utc(2025, 1, 1));
             await AddSegmentAsync(trip2024, 0);
@@ -949,7 +965,7 @@ namespace Tests.Services
             // Assert
             var poland = result.Data!.Single();
             await Assert.That(poland.CountryCode).IsEqualTo("PL");
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Warsaw" })).IsTrue();
+            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Warszawa" })).IsTrue();
             await Assert.That(poland.Trips.Single().TripId).IsEqualTo(trip2025.Id);
         }
 
@@ -1004,7 +1020,7 @@ namespace Tests.Services
         {
             // Arrange
             var user = await AddUserAsync();
-            var warsaw = await AddPlaceAsync("Warsaw", _poland);
+            var warsaw = await AddPlaceAsync("Warszawa", _poland);
             var deletedTrip = await AddTripAsync(user, Utc(2025, 1, 1));
             var activeTrip = await AddTripAsync(user, Utc(2024, 1, 1));
             await AddSegmentAsync(deletedTrip, 0);
@@ -1024,7 +1040,7 @@ namespace Tests.Services
             // Assert
             var poland = result.Data!.Single();
             await Assert.That(poland.CountryCode).IsEqualTo("PL");
-            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Krakow" })).IsTrue();
+            await Assert.That(poland.PlaceNames.SequenceEqual(new[] { "Kraków" })).IsTrue();
             await Assert.That(poland.Trips.Single().TripId).IsEqualTo(activeTrip.Id);
         }
 
@@ -1156,16 +1172,22 @@ namespace Tests.Services
             };
         }
 
-        private static TripPointCommand CreateTripPoint(
+        private TripPointCommand CreateTripPoint(
             string name,
             double latitude,
             double longitude)
         {
+            var placeId = name switch
+            {
+                "Kraków" or "Krakow" => _krakow.Id,
+                "Rzym" or "Rome" => _rome.Id,
+                "Warszawa" => _warsaw.Id,
+                _ => Guid.NewGuid()
+            };
+
             return new TripPointCommand
             {
-                Name = name,
-                Latitude = latitude,
-                Longitude = longitude
+                PlaceId = placeId
             };
         }
 
@@ -1243,6 +1265,8 @@ namespace Tests.Services
                 .ToListAsync();
 
             await Assert.That(segments.Count).IsEqualTo(2);
+            var placesCount = await _context.Places.CountAsync();
+            await Assert.That(placesCount).IsEqualTo(3);
             await Assert.That(segments[0].Geometry.Coordinates.Length).IsEqualTo(2);
             await Assert.That(segments[0].Geometry.SRID).IsEqualTo(GeoConst.SRID);
             await Assert.That(segments[0].DistanceKm).IsGreaterThan(0m);
@@ -1567,7 +1591,7 @@ namespace Tests.Services
 
             await Assert.That(trips).IsEmpty();
             await Assert.That(segments).IsEmpty();
-            await Assert.That(places.Count).IsEqualTo(2);
+            await Assert.That(places.Count).IsEqualTo(3);
             await Assert.That(visits).IsEmpty();
         }
 
@@ -1641,6 +1665,122 @@ namespace Tests.Services
             await Assert.That(activeSegments.Count).IsEqualTo(1);
             await Assert.That(visits.Count).IsEqualTo(2);
         }
+
+        [Test]
+        public async Task UpdateTripAsync_WhenSegmentIsUnchanged_ShouldPreserveIdAndSavedRoute()
+        {
+            // Arrange
+            await SetDistinctCountryBoundariesAsync();
+
+            var user = await AddUserAsync();
+            var service = CreateManagementService();
+
+            var created = await service.CreateTripAsync(
+                user.Id,
+                CreateUpsertTripCommand(
+                    "Pierwotna nazwa",
+                    null,
+                    Utc(2025, 6, 1),
+                    null,
+                    new[]
+                    {
+                CreateTripSegment(
+                    CreateTripPoint("Kraków", 50.0647, 19.945),
+                    CreateTripPoint("Rzym", 41.9028, 12.4964),
+                    TransportTypeEnum.Train)
+                    }));
+
+            var segmentId = created.Data!.Segments.Single().SegmentId;
+
+            var savedRoute = new LineString(
+                new[]
+                {
+            _krakow.Location.Coordinate,
+            new Coordinate(16.00, 48.00),
+            _rome.Location.Coordinate
+                })
+            {
+                SRID = GeoConst.SRID
+            };
+
+            var storedSegment = await _context.TripSegments
+                .SingleAsync(segment => segment.Id == segmentId);
+
+            storedSegment.Geometry = savedRoute;
+            storedSegment.DistanceKm = 987.65m;
+            storedSegment.IsFallbackRoute = false;
+
+            await _context.SaveChangesAsync();
+
+            var updateCommand = CreateUpsertTripCommand(
+                "Zmieniona nazwa",
+                null,
+                Utc(2025, 6, 1),
+                null,
+                new[]
+                {
+            CreateTripSegment(
+                CreateTripPoint("Kraków", 50.0647, 19.945),
+                CreateTripPoint("Rzym", 41.9028, 12.4964),
+                TransportTypeEnum.Train)
+                });
+
+            // Act
+            var result = await service.UpdateTripAsync(
+                user.Id,
+                created.Data.Id,
+                updateCommand);
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsTrue();
+            await Assert.That(result.Data!.Segments.Single().SegmentId)
+                .IsEqualTo(segmentId);
+
+            var updatedSegment = await _context.TripSegments
+                .AsNoTracking()
+                .SingleAsync(segment => segment.Id == segmentId);
+
+            await Assert.That(updatedSegment.Geometry.Coordinates.Length)
+                .IsEqualTo(3);
+            await Assert.That(updatedSegment.DistanceKm).IsEqualTo(987.65m);
+            await Assert.That(updatedSegment.IsFallbackRoute).IsFalse();
+        }
+
+        [Test]
+        public async Task SearchPlacesAsync_ShouldReturnCatalogPlaceForAccentlessQueryAndIgnoreWildcards()
+        {
+            // Arrange
+            var privatePlace = new Place
+            {
+                Name = "Kraków prywatne",
+                CountryId = _poland.Id,
+                IsCatalogPlace = false,
+                Location = new Point(19.95, 50.07)
+                {
+                    SRID = GeoConst.SRID
+                }
+            };
+
+            _context.Places.Add(privatePlace);
+            await _context.SaveChangesAsync();
+
+            var service = new PlaceServices(
+                _context,
+                new LoggerFactory().CreateLogger<PlaceServices>(),
+                new FakeCancellationTokenAccessor());
+
+            // Act
+            var accentlessResult = await service.SearchPlacesAsync(
+                new PlaceSearchCommand { Query = "Krakow" });
+
+            var wildcardResult = await service.SearchPlacesAsync(
+                new PlaceSearchCommand { Query = "%%" });
+
+            // Assert
+            await Assert.That(accentlessResult.Data!.Count).IsEqualTo(1);
+            await Assert.That(accentlessResult.Data[0].Id).IsEqualTo(_krakow.Id);
+            await Assert.That(wildcardResult.Data).IsEmpty();
+        }
         #endregion
 
         #region Place search
@@ -1654,12 +1794,12 @@ namespace Tests.Services
                 new FakeCancellationTokenAccessor());
 
             // Act
-            var result = await service.SearchPlacesAsync("Kra");
+            var result = await service.SearchPlacesAsync(new PlaceSearchCommand { Query = "Kra" });
 
             // Assert
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
             await Assert.That(result.Data!.Count).IsEqualTo(1);
-            await Assert.That(result.Data[0].Name).IsEqualTo("Krakow");
+            await Assert.That(result.Data[0].Name).IsEqualTo("Kraków");
             await Assert.That(result.Data[0].CountryName).IsEqualTo("Poland");
             await Assert.That(result.Data[0].CountryCode).IsEqualTo("PL");
             await Assert.That(result.Data[0].Latitude).IsEqualTo(50.06);

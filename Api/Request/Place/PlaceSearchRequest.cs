@@ -2,6 +2,6 @@
 {
     public sealed record PlaceSearchRequest
     {
-        public string? Query { get; init; }
+        public string Query { get; init; } = string.Empty;
     }
 }

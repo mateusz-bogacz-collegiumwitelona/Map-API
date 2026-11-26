@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services.Interfaces;
 using Services.Response.Place;
+using Api.Mappers;
+using Api.Configuration;
 
 namespace Api.Controllers
 {
     [ApiController]
     [Route("api/place")]
-    [Authorize]
+    [Authorize(Policy = AuthorizationConfiguration.UserPolicy)]
     public class PlaceController : BaseController
     {
         [EndpointSummary("Search places")]
@@ -21,9 +23,10 @@ namespace Api.Controllers
         [HttpGet("search")]
         public async Task<IActionResult> SearchPlacesAsync(
             [FromQuery] PlaceSearchRequest request,
-            [FromServices] IPlaceServices places)
+            [FromServices] IPlaceServices places,
+            [FromServices] PlaceMapper mapper)
         {
-            var result = await places.SearchPlacesAsync(request.Query ?? string.Empty);
+            var result = await places.SearchPlacesAsync(mapper.MapSearch(request));
             return HandleResult(result);
         }
     }

@@ -70,8 +70,6 @@ namespace Api.Validators.Validators.Trip
                 return true;
             }
 
-            const double coordinateTolerance = 0.000001d;
-
             for (var index = 1; index < segments.Count; index++)
             {
                 var previousDestination = segments[index - 1]?.Destination;
@@ -79,15 +77,10 @@ namespace Api.Validators.Validators.Trip
 
                 if (previousDestination is null || currentOrigin is null)
                 {
-                    continue;
+                    return false;
                 }
 
-                if (Math.Abs(
-                        previousDestination.Latitude - currentOrigin.Latitude) >
-                        coordinateTolerance ||
-                    Math.Abs(
-                        previousDestination.Longitude - currentOrigin.Longitude) >
-                        coordinateTolerance)
+                if (previousDestination.PlaceId != currentOrigin.PlaceId)
                 {
                     return false;
                 }
@@ -118,27 +111,12 @@ namespace Api.Validators.Validators.Trip
         }
 
         private sealed class TripPointRequestValidator
-            : AbstractValidator<TripPointRequest>
+    : AbstractValidator<TripPointRequest>
         {
             public TripPointRequestValidator()
             {
-                RuleFor(x => x.Name)
-                    .Cascade(CascadeMode.Stop)
-                    .Must(name => !string.IsNullOrWhiteSpace(name))
-                    .WithErrorCode(ErrorCodes.TripPointInvalid)
-                    .MaximumLength(255)
-                    .WithErrorCode(ErrorCodes.TripPointInvalid);
-
-                RuleFor(x => x.Latitude)
-                    .Must(double.IsFinite)
-                    .WithErrorCode(ErrorCodes.TripPointInvalid)
-                    .InclusiveBetween(-90d, 90d)
-                    .WithErrorCode(ErrorCodes.TripPointInvalid);
-
-                RuleFor(x => x.Longitude)
-                    .Must(double.IsFinite)
-                    .WithErrorCode(ErrorCodes.TripPointInvalid)
-                    .InclusiveBetween(-180d, 180d)
+                RuleFor(x => x.PlaceId)
+                    .NotEmpty()
                     .WithErrorCode(ErrorCodes.TripPointInvalid);
             }
         }

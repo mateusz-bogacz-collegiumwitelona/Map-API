@@ -100,9 +100,7 @@ namespace Tests.Validators.Trip
             {
                 Origin = new TripPointRequest
                 {
-                    Name = "Warszawa",
-                    Latitude = 52.2297,
-                    Longitude = 21.0122
+                    PlaceId = Guid.NewGuid()
                 },
                 Destination = request.Segments[0].Origin,
                 TransportType = "Train"
@@ -129,7 +127,7 @@ namespace Tests.Validators.Trip
         }
 
         [Test]
-        public async Task Validate_WhenLatitudeIsOutsideRange_ShouldHaveTripPointErrorCode()
+        public async Task Validate_WhenPlaceIdIsEmpty_ShouldHaveTripPointErrorCode()
         {
             // Arrange
             var request = CreateValidRequest();
@@ -137,7 +135,7 @@ namespace Tests.Validators.Trip
             {
                 Destination = request.Segments[0].Destination with
                 {
-                    Latitude = 91
+                    PlaceId = Guid.Empty
                 }
             };
 
@@ -150,11 +148,11 @@ namespace Tests.Validators.Trip
             var result = await _validator.TestValidateAsync(request);
 
             // Assert
-            var latitudeError = result.Errors.Single(
+            var placeIdError = result.Errors.Single(
                 error => error.PropertyName ==
-                    "Segments[0].Destination.Latitude");
+                    "Segments[0].Destination.PlaceId");
 
-            await Assert.That(latitudeError.ErrorCode)
+            await Assert.That(placeIdError.ErrorCode)
                 .IsEqualTo(ErrorCodes.TripPointInvalid);
         }
 
@@ -200,15 +198,11 @@ namespace Tests.Validators.Trip
                     {
                         Origin = new TripPointRequest
                         {
-                            Name = "Kraków",
-                            Latitude = 50.0647,
-                            Longitude = 19.945
+                            PlaceId = Guid.Parse("00000000-0000-0000-0000-000000000001")
                         },
                         Destination = new TripPointRequest
                         {
-                            Name = "Rzym",
-                            Latitude = 41.9028,
-                            Longitude = 12.4964
+                            PlaceId = Guid.Parse("00000000-0000-0000-0000-000000000002")
                         },
                         TransportType = "Train"
                     }

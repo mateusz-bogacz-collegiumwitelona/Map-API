@@ -70,6 +70,7 @@ namespace Services.Services
                         .OrderBy(s => s.OrderIndex)
                         .Select(s => new TripRouteSegmentResponse
                         {
+                            SegmentId = s.Id,
                             OrderIndex = s.OrderIndex,
                             TransportType = s.TransportType,
                             DistanceKm = s.DistanceKm,
@@ -293,8 +294,6 @@ namespace Services.Services
                 .Where(segment => segment.TripId == tripId)
                 .ToListAsync(CancellationToken);
 
-            _context.TripSegments.RemoveRange(existingSegments);
-
             var existingVisits = await _context.VisitedCountries
                 .Where(visit => visit.TripId == tripId)
                 .ToListAsync(CancellationToken);
@@ -308,7 +307,10 @@ namespace Services.Services
 
             await _context.SaveChangesAsync(CancellationToken);
 
-            var segmentsResult = await CreateSegmentsAsync(trip, command.Segments);
+            var segmentsResult = await CreateSegmentsAsync(
+                trip,
+                command.Segments,
+                existingSegments);
 
             if (!segmentsResult.IsSuccess)
             {
@@ -320,10 +322,25 @@ namespace Services.Services
                     statusCode: segmentsResult.StatusCode);
             }
 
-            var newSegments = segmentsResult.Data!;
+            var updatedSegments = segmentsResult.Data!;
+            var existingSegmentIds = existingSegments
+                .Select(segment => segment.Id)
+                .ToHashSet();
 
-            _context.TripSegments.AddRange(newSegments);
-            AddVisitedCountries(trip, newSegments);
+            var retainedSegmentIds = updatedSegments
+                .Where(segment => existingSegmentIds.Contains(segment.Id))
+                .Select(segment => segment.Id)
+                .ToHashSet();
+
+            _context.TripSegments.RemoveRange(
+                existingSegments.Where(segment =>
+                    !retainedSegmentIds.Contains(segment.Id)));
+
+            _context.TripSegments.AddRange(
+                updatedSegments.Where(segment =>
+                    !existingSegmentIds.Contains(segment.Id)));
+
+            AddVisitedCountries(trip, updatedSegments);
 
             await _context.SaveChangesAsync(CancellationToken);
             await transaction.CommitAsync(CancellationToken);
@@ -336,7 +353,7 @@ namespace Services.Services
             return Result<TripDetailsResponse>.Success(
                 message: "Trip updated successfully.",
                 statusCode: StatusCodes.Status200OK,
-                data: ToResponse(trip, newSegments));
+                data: ToResponse(trip, updatedSegments));
         }
 
         public async Task<Result<TripDetailsResponse>> GetTripDetailsAsync(
@@ -417,45 +434,66 @@ namespace Services.Services
         }
 
         private async Task<Result<List<TripSegment>>> CreateSegmentsAsync(
-            Trip trip,
-            IReadOnlyList<TripSegmentCommand> commands)
+    Trip trip,
+    IReadOnlyList<TripSegmentCommand> commands,
+    IReadOnlyList<TripSegment>? existingSegments = null)
         {
-            var countries = await _context.Countries
-                .AsNoTracking()
-                .OrderBy(country => country.Code)
-                .ToListAsync(CancellationToken);
+            var placeIds = commands
+                .SelectMany(command => new[]
+                {
+            command.Origin.PlaceId,
+            command.Destination.PlaceId
+                })
+                .Distinct()
+                .ToList();
 
-            if (countries.Count == 0)
+            var placesById = await _context.Places
+                .Where(place =>
+                    place.IsCatalogPlace &&
+                    placeIds.Contains(place.Id))
+                .ToDictionaryAsync(
+                    place => place.Id,
+                    CancellationToken);
+
+            if (placesById.Count != placeIds.Count)
             {
-                throw new InvalidOperationException("No countries are configured.");
+                return Result<List<TripSegment>>.Failure(
+                    message: "One or more trip points were not found.",
+                    errorCode: ErrorCodes.TripPointInvalid,
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
             var segments = new List<TripSegment>(commands.Count);
-            var places = new List<Place>(commands.Count * 2);
+            var matchedSegmentIds = new HashSet<Guid>();
 
             for (var index = 0; index < commands.Count; index++)
             {
                 var command = commands[index];
+                var origin = placesById[command.Origin.PlaceId];
+                var destination = placesById[command.Destination.PlaceId];
 
-                var origin = CreatePlace(command.Origin, countries);
-                var destination = CreatePlace(command.Destination, countries);
+                var existingSegment = existingSegments?.FirstOrDefault(segment =>
+                    !matchedSegmentIds.Contains(segment.Id) &&
+                    segment.OriginPlaceId == origin.Id &&
+                    segment.DestinationPlaceId == destination.Id &&
+                    segment.TransportType == command.TransportType);
 
-                if (origin is null || destination is null)
+                if (existingSegment is not null)
                 {
-                    return Result<List<TripSegment>>.Failure(
-                        message: "A trip point must be inside a configured country.",
-                        errorCode: ErrorCodes.TripPointInvalid,
-                        statusCode: StatusCodes.Status400BadRequest);
-                }
+                    matchedSegmentIds.Add(existingSegment.Id);
+                    existingSegment.OrderIndex = index;
+                    existingSegment.OriginPlace = origin;
+                    existingSegment.DestinationPlace = destination;
+                    segments.Add(existingSegment);
 
-                places.Add(origin);
-                places.Add(destination);
+                    continue;
+                }
 
                 var geometry = new LineString(
                     new[]
                     {
-                        origin.Location.Coordinate,
-                        destination.Location.Coordinate
+                origin.Location.Coordinate,
+                destination.Location.Coordinate
                     })
                 {
                     SRID = GeoConst.SRID
@@ -466,7 +504,9 @@ namespace Services.Services
                     Trip = trip,
                     OrderIndex = index,
                     TransportType = command.TransportType,
+                    OriginPlaceId = origin.Id,
                     OriginPlace = origin,
+                    DestinationPlaceId = destination.Id,
                     DestinationPlace = destination,
                     DistanceKm = CalculateDistanceKm(
                         origin.Location,
@@ -476,37 +516,10 @@ namespace Services.Services
                 });
             }
 
-            _context.Places.AddRange(places);
-
             return Result<List<TripSegment>>.Success(
                 message: "Trip segments created successfully.",
                 statusCode: StatusCodes.Status200OK,
                 data: segments);
-        }
-
-        private static Place? CreatePlace(
-            TripPointCommand point,
-            IReadOnlyList<Country> countries)
-        {
-            var location = new Point(point.Longitude, point.Latitude)
-            {
-                SRID = GeoConst.SRID
-            };
-
-            var country = countries.FirstOrDefault(
-                candidate => candidate.Boundary.Covers(location));
-
-            if (country is null)
-            {
-                return null;
-            }
-
-            return new Place
-            {
-                Name = point.Name.Trim(),
-                CountryId = country.Id,
-                Location = location
-            };
         }
 
         private void AddVisitedCountries(
@@ -597,18 +610,21 @@ namespace Services.Services
                     .OrderBy(segment => segment.OrderIndex)
                     .Select(segment => new TripDetailsSegmentResponse
                     {
+                        SegmentId = segment.Id,
                         OrderIndex = segment.OrderIndex,
                         TransportType = segment.TransportType,
                         DistanceKm = segment.DistanceKm,
                         IsFallbackRoute = segment.IsFallbackRoute,
                         Origin = new TripPointResponse
                         {
+                            PlaceId = segment.OriginPlaceId,
                             Name = segment.OriginPlace.Name,
                             Latitude = segment.OriginPlace.Location.Y,
                             Longitude = segment.OriginPlace.Location.X
                         },
                         Destination = new TripPointResponse
                         {
+                            PlaceId = segment.DestinationPlaceId,
                             Name = segment.DestinationPlace.Name,
                             Latitude = segment.DestinationPlace.Location.Y,
                             Longitude = segment.DestinationPlace.Location.X

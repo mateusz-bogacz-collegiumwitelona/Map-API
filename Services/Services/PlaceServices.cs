@@ -8,6 +8,7 @@ using Services.Accessors.Interfaces;
 using Services.Interfaces;
 using Services.Response.Place;
 using Services.QueryExtension;
+using Services.Command.Place;
 
 namespace Services.Services
 {
@@ -31,8 +32,9 @@ namespace Services.Services
         }
 
         public async Task<Result<List<PlaceSearchResponse>>> SearchPlacesAsync(
-            string query)
+        PlaceSearchCommand command)
         {
+            var query = command.Query;
             var places = await _context.Places
                 .AsNoTracking()
                 .ApplySearch(query)

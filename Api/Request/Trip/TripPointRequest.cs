@@ -1,7 +1,7 @@
 ﻿namespace Api.Request.Trip
 {
-    public sealed record TripPointRequest : CoordinatesRequest
+    public sealed record TripPointRequest
     {
-        public required string Name { get; init; }
+        public required Guid PlaceId { get; init; }
     }
 }

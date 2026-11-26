@@ -11,11 +11,9 @@ namespace Api.Validators.Validators.Place
         {
             RuleFor(x => x.Query)
                 .Cascade(CascadeMode.Stop)
-                .Must(query => !string.IsNullOrWhiteSpace(query))
+                .NotEmpty()
                 .WithErrorCode(ErrorCodes.PlaceSearchQueryInvalid)
-                .Must(query => query!.Trim().Length >= 2)
-                .WithErrorCode(ErrorCodes.PlaceSearchQueryInvalid)
-                .Must(query => query!.Trim().Length <= 100)
+                .Length(2, 100)
                 .WithErrorCode(ErrorCodes.PlaceSearchQueryInvalid);
         }
     }

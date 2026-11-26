@@ -19,7 +19,7 @@ namespace Infrastructure.Seeders
 
         public async Task SeedPlacesAsync()
         {
-            if (await _context.Places.AnyAsync())
+            if (await _context.Places.AnyAsync(place => place.IsCatalogPlace))
             {
                 _logger.LogInformation("Places already exist. Skipping place seeding.");
                 return;
@@ -41,6 +41,7 @@ namespace Infrastructure.Seeders
             Place CreatePlace(string name, string countryCode, double lng, double lat) => new()
             {
                 Name = name,
+                IsCatalogPlace = true,
                 CountryId = countryMap[countryCode],
                 Location = new Point(lng, lat) { SRID = GeoConst.SRID }
             };
@@ -78,14 +79,14 @@ namespace Infrastructure.Seeders
 
             if (countryMap.TryGetValue("IT", out var itId))
             {
-                places.Add(new Place { Name = "Rzym", CountryId = itId, Location = new Point(12.49, 41.90) { SRID = GeoConst.SRID } });
-                places.Add(new Place { Name = "Wenecja", CountryId = itId, Location = new Point(12.33, 45.44) { SRID = GeoConst.SRID } });
+                places.Add(new Place { Name = "Rzym", CountryId = itId, Location = new Point(12.49, 41.90) { SRID = GeoConst.SRID }, IsCatalogPlace = true });
+                places.Add(new Place { Name = "Wenecja", CountryId = itId, Location = new Point(12.33, 45.44) { SRID = GeoConst.SRID }, IsCatalogPlace = true });
             }
 
             if (countryMap.TryGetValue("FR", out var frId))
             {
-                places.Add(new Place { Name = "Paryż", CountryId = frId, Location = new Point(2.35, 48.85) { SRID = GeoConst.SRID } });
-                places.Add(new Place { Name = "Nicea", CountryId = frId, Location = new Point(7.26, 43.71) { SRID = GeoConst.SRID } });
+                places.Add(new Place { Name = "Paryż", CountryId = frId, Location = new Point(2.35, 48.85) { SRID = GeoConst.SRID }, IsCatalogPlace = true });
+                places.Add(new Place { Name = "Nicea", CountryId = frId, Location = new Point(7.26, 43.71) { SRID = GeoConst.SRID }, IsCatalogPlace = true });
             }
 
             await _context.Places.AddRangeAsync(places);

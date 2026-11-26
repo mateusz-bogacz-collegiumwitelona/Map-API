@@ -1,5 +1,4 @@
 using Domain.Enum;
-using System.Text.Json.Serialization;
 
 namespace Services.Response.Trip
 {
@@ -12,5 +11,6 @@ namespace Services.Response.Trip
         public required string OriginName { get; init; }
         public required string DestinationName { get; init; }
         public required List<GeoCoordinate> Coordinates { get; init; }
+        public required Guid SegmentId { get; init; }
     }
 }
