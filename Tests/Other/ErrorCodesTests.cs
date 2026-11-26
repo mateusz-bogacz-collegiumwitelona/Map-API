@@ -111,7 +111,6 @@ namespace Tests.Other
                 ErrorCodes.FirstNameInvalid,
                 ErrorCodes.LastNameInvalid,
                 ErrorCodes.BioInvalid,
-                ErrorCodes.YearInvalid,
                 ErrorCodes.TripTitleInvalid,
                 ErrorCodes.TripDescriptionInvalid,
                 ErrorCodes.TripDateRangeInvalid,

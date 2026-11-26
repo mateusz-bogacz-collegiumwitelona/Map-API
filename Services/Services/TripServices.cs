@@ -27,7 +27,6 @@ namespace Services.Services
         private CancellationToken _ct => _ctAccessor.Token;
         private CancellationToken CancellationToken => _ct;
 
-        private const double EarthRadiusKm = 6371.0088;
 
 
         public TripServices(
@@ -632,31 +631,17 @@ namespace Services.Services
 
         private static decimal CalculateDistanceKm(Point origin, Point destination)
         {
-            var latitude1 = DegreesToRadians(origin.Y);
-            var latitude2 = DegreesToRadians(destination.Y);
-            var latitudeDelta = DegreesToRadians(destination.Y - origin.Y);
-            var longitudeDelta = DegreesToRadians(destination.X - origin.X);
-
-            var a =
-                Math.Pow(Math.Sin(latitudeDelta / 2), 2) +
-                Math.Cos(latitude1) *
-                Math.Cos(latitude2) *
-                Math.Pow(Math.Sin(longitudeDelta / 2), 2);
-
-            a = Math.Clamp(a, 0d, 1d);
-
-            var distance = EarthRadiusKm *
-                2d *
-                Math.Atan2(Math.Sqrt(a), Math.Sqrt(1d - a));
+            var distance = GeoDistanceHelper.HaversineKm(
+                origin.Y,
+                origin.X,
+                destination.Y,
+                destination.X);
 
             return decimal.Round(
                 (decimal)distance,
                 2,
                 MidpointRounding.AwayFromZero);
         }
-
-        private static double DegreesToRadians(double degrees)
-            => degrees * Math.PI / 180d;
 
         private static (DateTime StartDate, DateTime? EndDate) NormalizeDates(
             UpsertTripCommand command)
