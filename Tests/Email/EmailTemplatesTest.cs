@@ -67,5 +67,42 @@ namespace Tests.Email
             await Assert.That(content.TextBody).Contains("654321");
             await Assert.That(content.TextBody).Contains("240 minutes");
         }
+
+        [Test]
+        public async Task AccountBannedNotification_WhenPermanent_ShouldContainReasonAndPermanentInfoInBothBodies()
+        {
+            // Act
+            var content = EmailTemplates.AccountBannedNotification("Jan", "Severe harassment", null);
+
+            // Assert
+            await Assert.That(content.Subject).IsEqualTo("Your account has been suspended");
+            await Assert.That(content.HtmlBody).Contains("Jan");
+            await Assert.That(content.HtmlBody).Contains("Severe harassment");
+            await Assert.That(content.HtmlBody).Contains("<strong>permanently</strong>");
+            await Assert.That(content.TextBody).Contains("Jan");
+            await Assert.That(content.TextBody).Contains("Severe harassment");
+            await Assert.That(content.TextBody).Contains("permanently");
+        }
+
+        [Test]
+        public async Task AccountBannedNotification_WhenTemporary_ShouldContainFormattedUtcDateAndReasonInBothBodies()
+        {
+            // Arrange
+            var bannedUntil = new DateTime(2026, 12, 24, 15, 30, 0, DateTimeKind.Utc);
+
+            // Act
+            var content = EmailTemplates.AccountBannedNotification("Anna", "Spam links", bannedUntil);
+
+            // Assert
+            await Assert.That(content.Subject).IsEqualTo("Your account has been suspended");
+            await Assert.That(content.HtmlBody).Contains("Anna");
+            await Assert.That(content.HtmlBody).Contains("Spam links");
+            await Assert.That(content.HtmlBody).Contains("2026-12-24 15:30 UTC");
+            await Assert.That(content.HtmlBody).DoesNotContain("permanently");
+            await Assert.That(content.TextBody).Contains("Anna");
+            await Assert.That(content.TextBody).Contains("Spam links");
+            await Assert.That(content.TextBody).Contains("2026-12-24 15:30 UTC");
+            await Assert.That(content.TextBody).DoesNotContain("permanently");
+        }
     }
 }

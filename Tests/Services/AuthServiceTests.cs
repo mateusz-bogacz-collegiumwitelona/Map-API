@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Services.Accessors;
 using Services.Accessors.Interfaces;
-using Services.Commands.Auth;
+using Services.Command.Auth;
 using Services.Interfaces.Auth;
 using Services.Options;
 using Services.Services.Auth;
@@ -146,8 +146,9 @@ namespace Tests.Services
             var createScript = Context.Database.GenerateCreateScript();
             await Context.Database.ExecuteSqlRawAsync(createScript);
 
-            await CreateRoleAsync("User");
-            await CreateRoleAsync("Admin");
+
+            await CreateRoleAsync(RolesConst.User);
+            await CreateRoleAsync(RolesConst.Admin);
         }
 
         [After(Test)]
@@ -198,7 +199,7 @@ namespace Tests.Services
             var data = result.Data!;
 
             await Assert.That(data.UserId).IsEqualTo(user.Id);
-            await Assert.That(data.Roles).Contains("User");
+            await Assert.That(data.Roles).Contains(RolesConst.User);
             await Assert.That(string.IsNullOrWhiteSpace(data.AccessToken)).IsFalse();
             await Assert.That(data.AccessTokenExpiration).IsGreaterThan(DateTime.UtcNow);
 
@@ -214,8 +215,8 @@ namespace Tests.Services
             await Assert.That(emailClaim).IsNotNull();
             await Assert.That(emailClaim!.Value).IsEqualTo(user.Email);
 
-            var hasUserRole = principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == "User")
-                || principal.FindAll("role").Any(claim => claim.Value == "User");
+            var hasUserRole = principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == RolesConst.User)
+                || principal.FindAll("role").Any(claim => claim.Value == RolesConst.User);
             await Assert.That(hasUserRole).IsTrue();
 
             var storedToken = await Context.RefreshTokens
@@ -380,12 +381,13 @@ namespace Tests.Services
         }
 
         [Test]
-        public async Task LoginAsync_WhenAccountBanHasExpired_AllowsAuthentication()
+        public async Task LoginAsync_WhenAccountBanHasExpired_AllowsAuthenticationAndClearsBanInDatabase()
         {
             // Arrange
             var user = await CreateUserAsync("expired-ban@example.com");
             user.IsBanned = true;
             user.BannedUntil = DateTime.UtcNow.AddMinutes(-1);
+            user.BannedReason = "Temporary violation";
             await Context.SaveChangesAsync();
 
             // Act
@@ -394,6 +396,29 @@ namespace Tests.Services
             // Assert
             await Assert.That(result.IsSuccess).IsTrue();
             await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(result.Data).IsNotNull();
+
+            Context.ChangeTracker.Clear();
+
+            var updatedUser = await Context.Users
+                .AsNoTracking()
+                .SingleAsync(u => u.Id == user.Id);
+
+            await Assert.That(updatedUser.IsBanned).IsFalse();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsNull();
+        }
+
+        [Test]
+        public async Task LoginAsync_WhenCancellationTokenIsCancelled_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // Act & Assert
+            await Assert.That(async () => await Sut.LoginAsync(new LoginCommand("test@example.com", Password), cts.Token))
+                .Throws<OperationCanceledException>();
         }
 
         [Test]
@@ -593,6 +618,97 @@ namespace Tests.Services
             await Assert.That(refreshResult.Data).IsNull();
 
             await Assert.That(await Context.RefreshTokens.CountAsync()).IsEqualTo(1);
+        }
+
+        [Test]
+        public async Task RefreshAsync_WhenAccountBanHasExpired_AllowsRefreshAndClearsBanInDatabase()
+        {
+            // Arrange
+            var user = await CreateUserAsync("expired-ban-refresh@example.com");
+            var loginResult = await Sut.LoginAsync(new LoginCommand(user.Email!, Password));
+            var refreshToken = loginResult.Data!.RefreshToken;
+
+            user.IsBanned = true;
+            user.BannedUntil = DateTime.UtcNow.AddMinutes(-5);
+            user.BannedReason = "Expired temporary ban";
+            await Context.SaveChangesAsync();
+
+            // Act
+            var refreshResult = await Sut.RefreshAsync(refreshToken);
+
+            // Assert
+            await Assert.That(refreshResult.IsSuccess).IsTrue();
+            await Assert.That(refreshResult.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+            await Assert.That(refreshResult.Data).IsNotNull();
+            await Assert.That(refreshResult.Data!.RefreshToken).IsNotEqualTo(refreshToken);
+
+            Context.ChangeTracker.Clear();
+
+            var updatedUser = await Context.Users
+                .AsNoTracking()
+                .SingleAsync(u => u.Id == user.Id);
+
+            await Assert.That(updatedUser.IsBanned).IsFalse();
+            await Assert.That(updatedUser.BannedUntil).IsNull();
+            await Assert.That(updatedUser.BannedReason).IsNull();
+        }
+
+        [Test]
+        public async Task RefreshAsync_WhenAccountHasActiveTemporaryBan_RevokesAllTokensAndRejectsRefresh()
+        {
+            // Arrange
+            var user = await CreateUserAsync("temp-banned-refresh@example.com");
+            var loginResult = await Sut.LoginAsync(new LoginCommand(user.Email!, Password));
+            var refreshToken = loginResult.Data!.RefreshToken;
+
+            user.IsBanned = true;
+            user.BannedUntil = DateTime.UtcNow.AddDays(2);
+            user.BannedReason = "Active temporary ban";
+            await Context.SaveChangesAsync();
+
+            // Act
+            var refreshResult = await Sut.RefreshAsync(refreshToken);
+
+            // Assert
+            await Assert.That(refreshResult.IsSuccess).IsFalse();
+            await Assert.That(refreshResult.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
+            await Assert.That(refreshResult.ErrorCode).IsEqualTo(ErrorCodes.AccountBanned);
+            await Assert.That(refreshResult.Data).IsNull();
+
+            Context.ChangeTracker.Clear();
+
+            var storedTokens = await Context.RefreshTokens
+                .AsNoTracking()
+                .Where(t => t.UserId == user.Id)
+                .ToListAsync();
+
+            await Assert.That(storedTokens.All(t => t.IsRevoked)).IsTrue();
+        }
+
+        [Test]
+        public async Task RefreshAsync_WhenRefreshTokenDoesNotExist_ReturnsInvalidRefreshToken()
+        {
+            // Act
+            var result = await Sut.RefreshAsync("non-existent-refresh-token");
+
+            // Assert
+            await Assert.That(result.IsSuccess).IsFalse();
+            await Assert.That(result.StatusCode).IsEqualTo(StatusCodes.Status401Unauthorized);
+            await Assert.That(result.ErrorCode).IsEqualTo(ErrorCodes.InvalidRefreshToken);
+            await Assert.That(result.Message).IsEqualTo("Invalid or expired refresh token.");
+            await Assert.That(result.Data).IsNull();
+        }
+
+        [Test]
+        public async Task RefreshAsync_WhenCancellationTokenIsCancelled_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            // Act & Assert
+            await Assert.That(async () => await Sut.RefreshAsync("any-token", cts.Token))
+                .Throws<OperationCanceledException>();
         }
 
         #endregion

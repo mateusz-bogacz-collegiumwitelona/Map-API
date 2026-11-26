@@ -37,12 +37,7 @@
         public const string EmailTaken = "USR_005";
         public const string EmailUnchanged = "USR_006";
         public const string EmailAlreadyExist = "USR_007";
-        #endregion
-
-        #region Verification
-        public const string CodeInvalid = "VER_001";
-        public const string CodeExpired = "VER_002";
-        public const string AttemptsExceeded = "VER_003";
+        public const string UserNotFound = "USR_008";
         #endregion
 
         #region Trip
@@ -53,10 +48,31 @@
         public const string TripSegmentsInvalid = "TRIP_005";
         public const string TripPointInvalid = "TRIP_006";
         public const string TripTransportTypeInvalid = "TRIP_007";
+        public const string RouteInvalid = "TRIP_008";
+        public const string DistanceInvalid = "TRIP_009";
+        public const string RouteEndpointsMismatch = "TRIP_010";
+        #endregion
+
+        #region Verification
+        public const string CodeInvalid = "VER_001";
+        public const string CodeExpired = "VER_002";
+        public const string AttemptsExceeded = "VER_003";
         #endregion
 
         #region Place
         public const string PlaceSearchQueryInvalid = "PLACE_001";
+        #endregion
+
+        #region Ban / Report
+        public const string ReportEmpty = "BAN_001";
+        public const string ReportTooLong = "BAN_002";
+        public const string ReportTooShort = "BAN_003";
+        public const string ReportNotFound = "BAN_004";
+        public const string ReportAlreadyResolved = "BAN_005";
+        public const string UserAlreadyBanned = "BAN_006";
+        public const string BanDurationInvalid = "BAN_007";
+        public const string BanDurationNotAllowed = "BAN_008";
+        public const string UserNotBanned = "BAN_009";
         #endregion
     }
 }

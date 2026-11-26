@@ -4,6 +4,7 @@ namespace Services.Response.Trip
 {
     public record TripRouteSegmentResponse
     {
+        public required Guid SegmentId { get; init; }
         public required int OrderIndex { get; init; }
         public required TransportTypeEnum TransportType { get; init; }
         public required decimal DistanceKm { get; init; }
@@ -11,6 +12,5 @@ namespace Services.Response.Trip
         public required string OriginName { get; init; }
         public required string DestinationName { get; init; }
         public required List<GeoCoordinate> Coordinates { get; init; }
-        public required Guid SegmentId { get; init; }
     }
 }

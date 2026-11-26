@@ -6,6 +6,7 @@
         {
             services.AddSingleton<AuthMapper>();
             services.AddSingleton<UserMapper>();
+            services.AddSingleton<BanMapper>();
             services.AddSingleton<ListMapper>();
             services.AddSingleton<TripMapper>();
             services.AddSingleton<PlaceMapper>();

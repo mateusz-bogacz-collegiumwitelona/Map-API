@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain.Const;
+using Domain.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -37,7 +38,7 @@ namespace Infrastructure.Seeders
             {
                 if (await _roleManager.Roles.AnyAsync()) return;
 
-                string[] roleNames = { "Admin", "User" };
+                string[] roleNames = { RolesConst.Admin, RolesConst.User };
 
                 foreach (var roleName in roleNames)
                 {
@@ -70,9 +71,8 @@ namespace Infrastructure.Seeders
         {
             try
             {
-                if (!await _roleManager.RoleExistsAsync("Admin") ||
-                        !await _roleManager.RoleExistsAsync("Manager") ||
-                        !await _roleManager.RoleExistsAsync("User"))
+                if (!await _roleManager.RoleExistsAsync(RolesConst.Admin) ||
+                        !await _roleManager.RoleExistsAsync(RolesConst.User))
                 {
                     await SeedRoleAsync();
                 }
@@ -86,7 +86,7 @@ namespace Infrastructure.Seeders
                 await CreateUserAsync(
                     email: adminEmail,
                     password: adminPassword,
-                    role: "Admin",
+                    role: RolesConst.Admin,
                     firstName: "Tomasz",
                     lastName: "Kot",
                     bio: null,
@@ -97,7 +97,7 @@ namespace Infrastructure.Seeders
                 await CreateUserAsync(
                     email: "public@example.pl",
                     password: "Public123!",
-                    role: "User",
+                    role: RolesConst.User,
                     firstName: "Adam",
                     lastName: "Kowalki",
                     bio: "Test public account",
@@ -108,7 +108,7 @@ namespace Infrastructure.Seeders
                 await CreateUserAsync(
                     email: "private@example.pl",
                     password: "Private123!",
-                    role: "User",
+                    role: RolesConst.User,
                     firstName: "Jan",
                     lastName: "Urban",
                     bio: "Test private account",
@@ -120,7 +120,7 @@ namespace Infrastructure.Seeders
                     await CreateUserAsync(
                         email: $"Test{i}@example.pl",
                         password: $"TestUser{i}!123",
-                        role: "User",
+                        role: RolesConst.User,
                         firstName: $"Test{i}",
                         lastName: $"Test{i}",
                         bio: "Test private account",

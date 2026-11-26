@@ -198,8 +198,8 @@ namespace Services.Services
         }
 
         private async Task<Guid?> GetReadableUserIdAsync(
-            Guid currentUserId,
-            Guid? targetUserId)
+        Guid currentUserId,
+        Guid? targetUserId)
         {
             var resolvedUserId = targetUserId ?? currentUserId;
             var isOwner = resolvedUserId == currentUserId;
@@ -210,6 +210,90 @@ namespace Services.Services
                     _ct);
 
             return canRead ? resolvedUserId : null;
+        }
+        public async Task<Result> UpdateSegmentRouteAsync(Guid userId, Guid segmentId, UpdateSegmentRouteCommand command)
+        {
+            var points = RemoveConsecutiveDuplicates(command.Coordinates);
+
+            if (points.Count < TripConst.MinRoutePoints)
+            {
+                _logger.LogWarning("Route for segment ID: {SegmentId} has fewer than {MinRoutePoints} distinct points", segmentId, TripConst.MinRoutePoints);
+
+                return Result.Failure(
+                    message: $"Route must have at least {TripConst.MinRoutePoints} distinct points.",
+                    errorCode: ErrorCodes.RouteInvalid,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var found = await _context.TripSegments
+                .Where(s => s.Id == segmentId && s.Trip.UserId == userId)
+                .Select(s => new
+                {
+                    Segment = s,
+                    Origin = s.OriginPlace.Location,
+                    Destination = s.DestinationPlace.Location
+                })
+                .FirstOrDefaultAsync(_ct);
+
+            if (found == null)
+            {
+                _logger.LogWarning("Trip segment ID: {SegmentId} was not found for user ID: {UserId}", segmentId, userId);
+
+                return Result.Failure(
+                    message: $"Trip segment with ID '{segmentId}' was not found.",
+                    errorCode: ErrorCodes.NotFound,
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            if (!IsNear(points[0], found.Origin) || !IsNear(points[^1], found.Destination))
+            {
+                _logger.LogWarning("Route for segment ID: {SegmentId} does not connect its origin and destination", segmentId);
+
+                return Result.Failure(
+                    message: FormattableString.Invariant($"Route must start within {TripConst.RouteEndpointToleranceKm} km of the segment origin and end within {TripConst.RouteEndpointToleranceKm} km of its destination."),
+                    errorCode: ErrorCodes.RouteEndpointsMismatch,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var routeKm = RouteLengthKm(points);
+            var distanceKm = (double)command.DistanceKm;
+
+            if (distanceKm + TripConst.RouteDistanceRoundingKm < routeKm * (1 - TripConst.RouteDistanceTolerance))
+            {
+                _logger.LogWarning("Distance {DistanceKm} km for segment ID: {SegmentId} is shorter than the route length {RouteKm} km", command.DistanceKm, segmentId, routeKm);
+
+                return Result.Failure(
+                    message: "Distance cannot be shorter than the length of the route line.",
+                    errorCode: ErrorCodes.DistanceInvalid,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var maxRatio = command.IsFallbackRoute ? 1 + TripConst.RouteDistanceTolerance : TripConst.MaxRouteDistanceRatio;
+
+            if (distanceKm - TripConst.RouteDistanceRoundingKm > routeKm * maxRatio)
+            {
+                _logger.LogWarning("Distance {DistanceKm} km for segment ID: {SegmentId} is more than {MaxRatio} times the route length {RouteKm} km", command.DistanceKm, segmentId, maxRatio, routeKm);
+
+                return Result.Failure(
+                    message: FormattableString.Invariant($"Distance cannot be more than {maxRatio} times the length of the route line."),
+                    errorCode: ErrorCodes.DistanceInvalid,
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var geometry = new LineString(points
+                .Select(p => new Coordinate(p.Longitude, p.Latitude))
+                .ToArray())
+            { SRID = GeoConst.SRID };
+
+            found.Segment.UpdateRoute(geometry, command.DistanceKm, command.IsFallbackRoute);
+
+            await _context.SaveChangesAsync(_ct);
+
+            _logger.LogInformation("Updated route of segment ID: {SegmentId} with {Count} points and {DistanceKm} km", segmentId, points.Count, command.DistanceKm);
+
+            return Result.Success(
+                message: "Segment route updated successfully.",
+                statusCode: StatusCodes.Status200OK);
         }
 
         public async Task<Result<TripDetailsResponse>> CreateTripAsync(
@@ -639,5 +723,40 @@ namespace Services.Services
                 .Coordinates
                 .Select(c => new GeoCoordinate { Latitude = c.Y, Longitude = c.X })
                 .ToList();
+
+        private static List<RoutePointCommand> RemoveConsecutiveDuplicates(IReadOnlyList<RoutePointCommand>? points)
+        {
+            var result = new List<RoutePointCommand>(points?.Count ?? 0);
+
+            if (points == null)
+            {
+                return result;
+            }
+
+            foreach (var point in points)
+            {
+                if (point != null && (result.Count == 0 || result[^1] != point))
+                {
+                    result.Add(point);
+                }
+            }
+
+            return result;
+        }
+
+        private static double RouteLengthKm(List<RoutePointCommand> points)
+        {
+            var length = 0.0;
+
+            for (var i = 1; i < points.Count; i++)
+            {
+                length += GeoDistanceHelper.HaversineKm(points[i - 1].Latitude, points[i - 1].Longitude, points[i].Latitude, points[i].Longitude);
+            }
+
+            return length;
+        }
+
+        private static bool IsNear(RoutePointCommand point, Point place)
+            => GeoDistanceHelper.HaversineKm(point.Latitude, point.Longitude, place.Y, place.X) <= TripConst.RouteEndpointToleranceKm;
     }
 }
